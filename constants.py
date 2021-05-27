@@ -1,6 +1,6 @@
 class DataConst:
     PREDICTION_LENGTH = 3
-    ENCODER_LENGTH = 24
+    ENCODER_LENGTH = 28
     SPECIAL_DAYS = [
         "easter_day",
         "good_friday",

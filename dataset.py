@@ -3,7 +3,7 @@ from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer
 
 
 def create_train_val_time_series_datasets(data):
-    training_cutoff = data.time_idx.max() - DataConst.PREDICTION_LENGTH
+    training_cutoff = data.time_idx.max() - DataConst.PREDICTION_LENGTH * 6
 
     training_timeseries_ds = TimeSeriesDataSet(
         data[lambda x: x.time_idx <= training_cutoff],
@@ -40,6 +40,6 @@ def create_train_val_time_series_datasets(data):
         add_target_scales=True,
         add_encoder_length=True,
     )
-    validation_timeseries_ds = TimeSeriesDataSet.from_dataset(training_timeseries_ds, data, predict=True,
-                                                              stop_randomization=True)
-    return training_timeseries_ds, validation_timeseries_ds
+    validation_timeseries_ds = training_timeseries_ds.from_parameters(training_timeseries_ds.get_parameters(), data, stop_randomization=False)
+    test_timeseries_ds = training_timeseries_ds.from_parameters(training_timeseries_ds.get_parameters(), data, stop_randomization=True)
+    return training_timeseries_ds, validation_timeseries_ds, test_timeseries_ds
