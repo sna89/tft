@@ -1,29 +1,36 @@
-from pytorch_forecasting.data.examples import get_stallion_data
 import pandas as pd
 from plot import plot_predictions
-from preprocess import preprocess
-from dataset import create_train_val_time_series_datasets
+from preprocess import preprocess_synthetic
+from dataset import create_datasets, get_data
 from constants import HyperParameters
 from Models.tft import create_trainer, create_tft_model, fit, evaluate, evaluate_base_model, get_fitted_model
 
 pd.set_option('display.max_columns', None)
 
-data = get_stallion_data()
-preprocess(data)
-training, validation = create_train_val_time_series_datasets(data)
-train_dataloader = training.to_dataloader(train=True, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
-val_dataloader = validation.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
+if __name__ == '__main__':
+    data = get_data("synthetic")
+    preprocess_synthetic(data)
+    train, val, test = create_datasets(data)
+    train_dataloader = train.to_dataloader(train=True, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
+    val_dataloader = val.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
+    test_dataloader = test.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
 
-trainer = create_trainer()
-tft_model = create_tft_model(training, train_dataloader, val_dataloader)
-trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
+    print(evaluate_base_model(val_dataloader))
+    print(evaluate_base_model(test_dataloader))
 
-model = get_fitted_model(trainer)
-plot_predictions(model, val_dataloader, train_dataloader)
+    trainer = create_trainer()
+    tft_model = create_tft_model(train)
+    trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
 
-# print(evaluate(trainer, val_dataloader))
-# print(evaluate_base_model(val_dataloader))
-# data = data[(data.agency == 'Agency_25') & (data.sku == 'SKU_03')]
-# print(data)
-# plot_volume_by_group(data, 'Agency_25')
+    print(evaluate(trainer, val_dataloader))
+    print(evaluate(trainer, test_dataloader))
+
+    model = get_fitted_model(trainer)
+    plot_predictions(model, test_dataloader)
+
+    # print(evaluate(trainer, val_dataloader))
+    # print(evaluate_base_model(val_dataloader))
+    # data = data[(data.agency == 'Agency_25') & (data.sku == 'SKU_03')]
+    # print(data)
+    # plot_volume_by_group(data, 'Agency_25')
 

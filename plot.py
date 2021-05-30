@@ -16,21 +16,16 @@ def plot_volume_by_group(data, agency=None, sku=None):
     del df
 
 
-def plot_predictions(model, val_dataloader, train_dataloader):
-    raw_predictions, x = model.predict(val_dataloader, mode="raw", return_x=True)
-    # index_df = val_dataloader.dataset.x_to_index(x)
-    # for idx in range(5):  # plot 10 examples
-    #     print(index_df.loc[idx, ['agency', 'sku']].values)
-    #     model.plot_prediction(x, raw_predictions, idx=idx, add_loss_to_title=True)
-    #     plt.show()
-    #     plt.close()
+def plot_predictions(model, test_dataloader):
+    raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
+    index_df = test_dataloader.dataset.x_to_index(x)
+    for idx in range(10):  # plot 10 examples
+        # print(index_df.loc[idx, ['agency', 'sku']].values)
+        model.plot_prediction(x, raw_predictions, idx=idx, add_loss_to_title=True)
+        plt.show()
+        plt.close()
     interpretation = model.interpret_output(raw_predictions, reduction="sum")
     model.plot_interpretation(interpretation)
     plt.show()
     plt.close()
 
-    raw_predictions, x = model.predict(train_dataloader, mode="raw", return_x=True)
-    interpretation = model.interpret_output(raw_predictions, reduction="sum")
-    model.plot_interpretation(interpretation)
-    plt.show()
-    plt.close()

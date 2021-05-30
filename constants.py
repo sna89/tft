@@ -1,6 +1,6 @@
 class DataConst:
-    PREDICTION_LENGTH = 3
-    ENCODER_LENGTH = 28
+    PREDICTION_LENGTH = 7
+    ENCODER_LENGTH = 100
     SPECIAL_DAYS = [
         "easter_day",
         "good_friday",
@@ -19,3 +19,8 @@ class DataConst:
 
 class HyperParameters:
     BATCH_SIZE = 32
+
+
+class DataSetRatio:
+    TRAIN = 0.6
+    VAL = 0.2

@@ -2,7 +2,12 @@ import numpy as np
 from constants import DataConst
 
 
-def preprocess(data):
+def preprocess_synthetic(data):
+    add_month_column(data)
+    add_day_column(data)
+
+
+def preprocess_stallion(data):
     data.drop(['timeseries'], axis=1, inplace=True)
     add_time_idx_column(data)
     add_month_column(data)
@@ -18,6 +23,10 @@ def add_time_idx_column(data):
 
 def add_month_column(data):
     data['month'] = data.date.dt.month.astype(str).astype("category")
+
+
+def add_day_column(data):
+    data['day'] = data.date.dt.day.astype(str).astype("category")
 
 
 def add_log_column(data, col_name):
