@@ -1,5 +1,5 @@
 class DataConst:
-    PREDICTION_LENGTH = 7
+    PREDICTION_LENGTH = 50
     ENCODER_LENGTH = 100
     SPECIAL_DAYS = [
         "easter_day",

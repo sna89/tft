@@ -8,7 +8,7 @@ def get_data(name="synthetic"):
     if name == "stallion":
         return get_stallion_data()
     else:
-        data = generate_ar_data(seasonality=20, timesteps=1000, n_series=10, trend=1, noise=0.05)
+        data = generate_ar_data(seasonality=10, timesteps=600, n_series=5, trend=0.5, noise=0.05)
         data["date"] = pd.Timestamp("2020-01-01") + pd.to_timedelta(data.time_idx, "D")
     return data
 
