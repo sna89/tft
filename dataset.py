@@ -1,4 +1,4 @@
-from constants import DataConst, DataSetRatio
+from constants import DataConst, DataSetRatio, DataSetParams
 from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer, NaNLabelEncoder
 from pytorch_forecasting.data.examples import get_stallion_data, generate_ar_data
 import pandas as pd
@@ -8,7 +8,11 @@ def get_data(name="synthetic"):
     if name == "stallion":
         return get_stallion_data()
     else:
-        data = generate_ar_data(seasonality=10, timesteps=600, n_series=5, trend=0.5, noise=0.05)
+        data = generate_ar_data(seasonality=DataSetParams.SEASONALITY,
+                                timesteps=600,
+                                n_series=DataSetParams.SERIES,
+                                trend=DataSetParams.TREND,
+                                noise=0.05)
         data["date"] = pd.Timestamp("2020-01-01") + pd.to_timedelta(data.time_idx, "D")
     return data
 
@@ -73,7 +77,7 @@ def create_datasets(data, name="synthetic"):
             time_varying_unknown_reals=["value"],
             time_varying_known_reals=["time_idx"],
             time_varying_known_categoricals=["month", "day"],
-            target_normalizer=GroupNormalizer(groups=["series"]),
+            # target_normalizer=GroupNormalizer(groups=["series"]),
             add_relative_time_idx=True,
             add_target_scales=True,
             randomize_length=None,

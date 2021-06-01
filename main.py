@@ -16,15 +16,15 @@ if __name__ == '__main__':
     val_dataloader = val.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=8)
     test_dataloader = test.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=8)
 
-    # print(evaluate_base_model(val_dataloader))
-    # print(evaluate_base_model(test_dataloader))
+    print(evaluate_base_model(val_dataloader))
+    print(evaluate_base_model(test_dataloader))
 
     trainer = create_trainer()
     tft_model = create_tft_model(train)
-    # trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
+    trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
 
-    # print(evaluate(trainer, val_dataloader))
-    # print(evaluate(trainer, test_dataloader))
+    print(evaluate(trainer, val_dataloader))
+    print(evaluate(trainer, test_dataloader))
 
     model = get_fitted_model(trainer)
     plot_predictions(model, test_dataloader)
