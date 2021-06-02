@@ -1,16 +1,16 @@
 import pandas as pd
-from plot import plot_predictions, plot_synthetic_data
-from preprocess import preprocess_synthetic
-from dataset import create_datasets, get_data
+from plot import plot_predictions, plot_data
+from datasets import create_datasets, get_data
 from constants import HyperParameters
 from Models.tft import create_trainer, create_tft_model, fit, evaluate, evaluate_base_model, get_fitted_model
-
+import warnings
+warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
 
 if __name__ == '__main__':
-    data = get_data("synthetic")
-    plot_synthetic_data(data)
-    preprocess_synthetic(data)
+    dataset_name = "2_fisherman"
+    data = get_data(dataset_name)
+    plot_data(dataset_name, data)
     train, val, test = create_datasets(data)
     train_dataloader = train.to_dataloader(train=True, batch_size=HyperParameters.BATCH_SIZE, num_workers=8)
     val_dataloader = val.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=8)

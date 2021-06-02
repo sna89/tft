@@ -42,6 +42,13 @@ def plot_predictions(model, test_dataloader):
     figs['decoder_variables'].figure.savefig('plots/' + 'decoder_variables_' + plot_name)
 
 
+def plot_data(dataset_name, data):
+    if dataset_name == 'synthetic':
+        plot_synthetic_data(data)
+    elif dataset_name == '2_fisherman':
+        plot_fisherman_data(data)
+
+
 def plot_synthetic_data(data):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
             Series=DataSetParams.SERIES,
@@ -51,3 +58,9 @@ def plot_synthetic_data(data):
 
     fig = px.line(data, y="value", x="time_idx", color='series')
     fig.write_html(plot_name)
+
+
+def plot_fisherman_data(data):
+    data_ = data[data.Type == 'internaltemp']
+    fig = px.line(data_, y="Value", x="time_idx", color='sensor')
+    fig.write_html('fisherman.html')

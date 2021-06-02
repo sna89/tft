@@ -27,6 +27,10 @@ class DataSetRatio:
 
 
 class DataSetParams:
-    SERIES = 20
+    SERIES = 1
     SEASONALITY = 30
     TREND = 2
+
+
+class Paths:
+    FISHERMAN = 'FishermanData'
