@@ -182,4 +182,4 @@ def create_datasets(data, name="synthetic"):
     parameters = train_ts_ds.get_parameters()
     validation_ts_ds = TimeSeriesDataSet.from_parameters(parameters, validation_df)
     test_ts_ds = TimeSeriesDataSet.from_parameters(parameters, test_df)
-    return train_ts_ds, validation_ts_ds, test_ts_ds
+    return train_df, validation_df, test_df, train_ts_ds, validation_ts_ds, test_ts_ds

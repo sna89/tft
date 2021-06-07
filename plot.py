@@ -24,9 +24,19 @@ def plot_fisherman_predictions(model, test_dataloader):
     raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
     index_df = test_dataloader.dataset.x_to_index(x)
     idx_list = list(index_df[index_df.time_idx.isin(list(range(1591, 1769, 30)))].index)
+
+    x_values = list(range(0, DataConst.PREDICTION_LENGTH))
+
     for idx in idx_list:
         time_idx, sensor = index_df.iloc[idx].values
         model.plot_prediction(x, raw_predictions, idx=idx, add_loss_to_title=True)
+
+        y_lower = raw_predictions['prediction'][idx][:, 0]
+        plt.plot(x_values, y_lower, label='lower_bound', c='red')
+
+        y_upper = raw_predictions['prediction'][idx][:, -1]
+        plt.plot(x_values, y_upper, label='lower_upper', c='red')
+
         plt.savefig('plots/prediction_sensor_{}_time_idx_{}'.format(sensor, time_idx))
         plt.show()
         plt.close()

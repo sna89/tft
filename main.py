@@ -1,5 +1,5 @@
 import pandas as pd
-from plot import plot_synthetic_predictions, plot_fisherman_predictions
+from plot import plot_data, plot_fisherman_predictions
 from datasets import create_datasets, get_data
 from constants import HyperParameters
 from Models.tft import create_trainer, create_tft_model, fit, get_fitted_model
@@ -16,7 +16,7 @@ if __name__ == '__main__':
     dataset_name = "2_fisherman"
     data = get_data(dataset_name)
     # plot_data(dataset_name, data)
-    train, val, test = create_datasets(data, dataset_name)
+    train_df, val_df, test_df, train, val, test = create_datasets(data, dataset_name)
     train_dataloader = train.to_dataloader(train=True, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
     val_dataloader = val.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
     test_dataloader = test.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
@@ -29,13 +29,12 @@ if __name__ == '__main__':
     # trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
 
     model = get_fitted_model(trainer)
-
+    plot_fisherman_predictions(model, test_dataloader)
     # print(evaluate(model, val_dataloader))
     # print(evaluate(model, test_dataloader))
 
-    calc_attention_dist(model, test_dataloader)
+    # calc_attention_dist(model, test_dataloader, test_df)
 
-    # print(evaluate(trainer, val_dataloader))
     # print(evaluate_base_model(val_dataloader))
     # data = data[(data.agency == 'Agency_25') & (data.sku == 'SKU_03')]
     # print(data)
