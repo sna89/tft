@@ -1,4 +1,4 @@
-from constants import DataConst, DataSetRatio, DataSetParams, Paths
+from constants import DataConst, DataSetRatio, SyntheticDataSetParams, Paths
 from preprocess import preprocess_synthetic, preprocess_single_df_fisherman
 from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer, NaNLabelEncoder
 from pytorch_forecasting.data.examples import get_stallion_data, generate_ar_data
@@ -15,6 +15,8 @@ def get_2_fisherman_data():
     for filename in os.listdir(Paths.FISHERMAN):
         full_file_path = os.path.join(Paths.FISHERMAN, filename)
         df = pd.read_csv(full_file_path, usecols=['Type', 'Value', 'Time'])
+        df = df[df.Type == 'internaltemp']
+        df = df.drop(columns=['Type'], axis=1)
         df['Time'] = pd.to_datetime(df['Time'])
 
         min_date_df = df.Time.min()
@@ -25,7 +27,7 @@ def get_2_fisherman_data():
         if max_date_df < min_max_date:
             min_max_date = max_date_df
 
-        df['sensor'] = filename.replace('Sensor ', '').replace('.csv', '')
+        df['Sensor'] = filename.replace('Sensor ', '').replace('.csv', '')
         dfs.append(df)
 
     dfs = list(map(lambda dfx: preprocess_single_df_fisherman(dfx,
@@ -40,10 +42,10 @@ def get_2_fisherman_data():
 
 
 def get_synthetic_data():
-    data = generate_ar_data(seasonality=DataSetParams.SEASONALITY,
+    data = generate_ar_data(seasonality=SyntheticDataSetParams.SEASONALITY,
                             timesteps=600,
-                            n_series=DataSetParams.SERIES,
-                            trend=DataSetParams.TREND,
+                            n_series=SyntheticDataSetParams.SERIES,
+                            trend=SyntheticDataSetParams.TREND,
                             noise=0.05)
     data["date"] = pd.Timestamp("2020-01-01") + pd.to_timedelta(data.time_idx, "D")
     return data
@@ -110,7 +112,31 @@ def define_synthetic_ts_ds(train_df):
 
 
 def define_2_fisherman_ts_ds(train_df):
-    pass
+    fisherman_train_ts_ds = TimeSeriesDataSet(
+        train_df,
+        time_idx="time_idx",
+        target="Value",
+        group_ids=["Sensor"],
+        min_encoder_length=DataConst.ENCODER_LENGTH,  # keep encoder length long (as it is in the validation set)
+        max_encoder_length=DataConst.ENCODER_LENGTH,
+        min_prediction_length=DataConst.PREDICTION_LENGTH,
+        max_prediction_length=DataConst.PREDICTION_LENGTH,
+        static_categoricals=["Sensor"],
+        static_reals=[],
+        time_varying_known_categoricals=["Minute", "Hour", "DayOfMonth", "DayOfWeek"],
+        time_varying_known_reals=["time_idx"],
+        time_varying_unknown_categoricals=[],
+        time_varying_unknown_reals=[
+            "Value"
+        ],
+        # target_normalizer=GroupNormalizer(
+        #     groups=["Sensor"]
+        # ),
+        add_relative_time_idx=True,
+        add_target_scales=True,
+        add_encoder_length=False
+    )
+    return fisherman_train_ts_ds
 
 
 def get_data(name="synthetic"):

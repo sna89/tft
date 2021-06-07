@@ -29,20 +29,25 @@ def filter_df_by_min_date(df, min_date=None, max_date=None):
 
 
 def set_row_time_idx(x):
-    time_idx = x.name // 2
+    time_idx = x.name
     return time_idx
 
 
 def preprocess_single_df_fisherman(data, min_date, max_date):
     data = filter_df_by_min_date(data, min_date, max_date)
     data.drop_duplicates(inplace=True)
-    data.reset_index(inplace=True, drop=True)
-    data['minute'] = data.Time.dt.minute
-    data['hour'] = data.Time.dt.hour
-    data['day_of_month'] = data.Time.dt.day
-    data['day_of_week'] = data.Time.dt.weekday
-    data['time_idx'] = data.apply(lambda x: set_row_time_idx(x), axis=1)
-    return data
+    sensor = data['Sensor'].iloc[0]
+    data_3h = data.set_index('Time').resample('3H').mean()
+    data_3h.fillna(method='bfill', inplace=True)
+    data_3h['Sensor'] = sensor
+    data_3h['Time'] = data_3h.index
+    data_3h.reset_index(inplace=True, drop=True)
+    data_3h['Minute'] = data_3h.Time.dt.minute.astype(str).astype("category")
+    data_3h['Hour'] = data_3h.Time.dt.hour.astype(str).astype("category")
+    data_3h['DayOfMonth'] = data_3h.Time.dt.day.astype(str).astype("category")
+    data_3h['DayOfWeek'] = data_3h.Time.dt.weekday.astype(str).astype("category")
+    data_3h['time_idx'] = data_3h.apply(lambda x: set_row_time_idx(x), axis=1)
+    return data_3h
 
 
 def add_time_idx_column(data):
