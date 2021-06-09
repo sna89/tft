@@ -1,8 +1,10 @@
-import plotly.express as px
 import matplotlib.pyplot as plt
-from constants import DataConst, SyntheticDataSetParams
+from constants import DataConst
 import plotly.express as px
 from pytorch_forecasting import Baseline
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from DataBuilders.synthetic import Params
 
 
 def plot_volume_by_group(data, agency=None, sku=None):
@@ -25,21 +27,59 @@ def plot_fisherman_predictions(model, test_dataloader):
     index_df = test_dataloader.dataset.x_to_index(x)
     idx_list = list(index_df[index_df.time_idx.isin(list(range(1591, 1769, 30)))].index)
 
-    x_values = list(range(0, DataConst.PREDICTION_LENGTH))
+    x_values_enc = list(range(-DataConst.ENCODER_LENGTH, 0))
+    x_values_pred = list(range(0, DataConst.PREDICTION_LENGTH))
 
+    interpretation = model.interpret_output(raw_predictions, attention_prediction_horizon=0)
+    prediction_idx = raw_predictions['prediction'][0].shape[1] // 2
     for idx in idx_list:
         time_idx, sensor = index_df.iloc[idx].values
-        model.plot_prediction(x, raw_predictions, idx=idx, add_loss_to_title=True)
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-        y_lower = raw_predictions['prediction'][idx][:, 0]
-        plt.plot(x_values, y_lower, label='lower_bound', c='red')
+        actual_enc = x['encoder_target'][idx]
+        fig.add_trace(
+            go.Scatter(x=x_values_enc, y=actual_enc, name="Actual", line=dict(color='royalblue', width=1)),
+            secondary_y=False,
+        )
 
-        y_upper = raw_predictions['prediction'][idx][:, -1]
-        plt.plot(x_values, y_upper, label='lower_upper', c='red')
+        actual_dec = x['decoder_target'][idx]
+        fig.add_trace(
+            go.Scatter(x=x_values_pred, y=actual_dec, name="Actual", line=dict(color='royalblue', width=4)),
+            secondary_y=False,
+        )
 
-        plt.savefig('plots/prediction_sensor_{}_time_idx_{}'.format(sensor, time_idx))
-        plt.show()
-        plt.close()
+        prediction = raw_predictions['prediction'][idx][:, prediction_idx]
+        fig.add_trace(
+            go.Scatter(x=x_values_pred, y=prediction, name="Prediction", line=dict(color='firebrick', width=4)),
+            secondary_y=False,
+        )
+
+        attention = interpretation["attention"][idx]
+        fig.add_trace(
+            go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='gray')),
+            secondary_y=True,
+        )
+
+        y_lower_quantile = raw_predictions['prediction'][idx][:, 0]
+        fig.add_trace(
+            go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile", line=dict(color='grey', dash='dash')),
+            secondary_y=False,
+        )
+
+        y_upper_quantile = raw_predictions['prediction'][idx][:, -1]
+        fig.add_trace(
+            go.Scatter(x=x_values_pred, y=y_upper_quantile, name="Upper Quantile", line=dict(color='grey', dash='dash'),
+                       fill='tonexty'),
+            secondary_y=False,
+        )
+
+        fig.update_xaxes(title_text="<b>Time</b>")
+
+        fig.update_yaxes(title_text="<b>Actual VS Prediction</b>", secondary_y=False)
+        fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
+
+        fig.write_html('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.html')
+
     interpretation = model.interpret_output(raw_predictions, reduction="sum", attention_prediction_horizon=0)
     figs = model.plot_interpretation(interpretation)
     figs['attention'].figure.savefig('plots/' + 'attention_' + plot_name)
@@ -62,9 +102,9 @@ def plot_baseline_predictions(test_dataloader):
 
 def plot_synthetic_predictions(model, test_dataloader):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
-            Series=SyntheticDataSetParams.SERIES,
-            Seasonality=SyntheticDataSetParams.SEASONALITY,
-            Trend=SyntheticDataSetParams.TREND
+            Series=Params.SERIES,
+            Seasonality=Params.SEASONALITY,
+            Trend=Params.TREND
         ).replace('.', '')
 
     raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
@@ -93,9 +133,9 @@ def plot_data(dataset_name, data):
 
 def plot_synthetic_data(data):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
-            Series=SyntheticDataSetParams.SERIES,
-            Seasonality=SyntheticDataSetParams.SEASONALITY,
-            Trend=SyntheticDataSetParams.TREND
+            Series=Params.SERIES,
+            Seasonality=Params.SEASONALITY,
+            Trend=Params.TREND
         ).replace('.', '')
 
     fig = px.line(data, y="value", x="time_idx", color='series')

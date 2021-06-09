@@ -1,20 +1,10 @@
+import os
+
+
 class DataConst:
+    DATASET_NAME = "electricity"
     PREDICTION_LENGTH = 24
     ENCODER_LENGTH = 100
-    SPECIAL_DAYS = [
-        "easter_day",
-        "good_friday",
-        "new_year",
-        "christmas",
-        "labor_day",
-        "independence_day",
-        "revolution_day_memorial",
-        "regional_games",
-        "fifa_u_17_world_cup",
-        "football_gold_cup",
-        "beer_capital",
-        "music_fest",
-    ]
 
 
 class HyperParameters:
@@ -26,11 +16,7 @@ class DataSetRatio:
     VAL = 0.2
 
 
-class SyntheticDataSetParams:
-    SERIES = 1
-    SEASONALITY = 30
-    TREND = 2
-
-
 class Paths:
-    FISHERMAN = 'FishermanData'
+    BASE_FOLDER = os.path.join('/', 'tmp', 'pycharm_project_269', 'Data')
+    FISHERMAN = os.path.join(BASE_FOLDER, 'Fisherman')
+    ELECTRICITY = os.path.join(BASE_FOLDER, 'Electricity')

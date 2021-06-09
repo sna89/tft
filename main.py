@@ -1,7 +1,6 @@
 import pandas as pd
 from plot import plot_data, plot_fisherman_predictions
-from datasets import create_datasets, get_data
-from constants import HyperParameters
+from constants import HyperParameters, DataConst
 from Models.tft import create_trainer, create_tft_model, fit, get_fitted_model
 from Models.attention_distance import calc_attention_dist
 from evaluation import evaluate, evaluate_base_model
@@ -13,9 +12,9 @@ cpu_count = multiprocessing.cpu_count()
 
 
 if __name__ == '__main__':
-    dataset_name = "2_fisherman"
+    dataset_name = DataConst.DATASET_NAME
     data = get_data(dataset_name)
-    # plot_data(dataset_name, data)
+    plot_data(dataset_name, data)
     train_df, val_df, test_df, train, val, test = create_datasets(data, dataset_name)
     train_dataloader = train.to_dataloader(train=True, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)
     val_dataloader = val.to_dataloader(train=False, batch_size=HyperParameters.BATCH_SIZE, num_workers=0)

@@ -12,12 +12,12 @@ def create_trainer():
     lr_logger = LearningRateMonitor(logging_interval='step')  # log the learning rate
 
     trainer = pl.Trainer(
-        gpus=1,
+        gpus=2,
         max_epochs=200,
         # gradient_clip_val=0.1,
         callbacks=[lr_logger, early_stop_callback],
         logger=logger,
-        # accelerator="ddp"
+        accelerator="ddp"
     )
     return trainer
 
@@ -52,7 +52,7 @@ def fit(trainer, model, train_dl, val_dl):
 
 def get_fitted_model(trainer):
     # best_model_path = trainer.checkpoint_callback.best_model_path
-    best_model_path = 'tb_logs/my_model/version_3/checkpoints/epoch=5-step=1583.ckpt'
+    best_model_path = 'tb_logs/my_model/version_0/checkpoints/epoch=1-step=293.ckpt'
     best_tft = TemporalFusionTransformer.load_from_checkpoint(best_model_path)
     return best_tft
 
