@@ -28,12 +28,12 @@ if __name__ == '__main__':
 
     trainer = create_trainer()
     tft_model = create_tft_model(train)
-    trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
+    # trainer = fit(trainer, tft_model, train_dataloader, val_dataloader)
 
     model = get_fitted_model(trainer)
-    plot_predictions(model, test_dataloader)
-    # print(evaluate(model, val_dataloader))
-    # print(evaluate(model, test_dataloader))
+    plot_predictions(model, test_dataloader, test_df)
+    evaluate(model, val_dataloader)
+    evaluate(model, test_dataloader)
 
     # calc_attention_dist(model, test_dataloader, test_df)
 

@@ -4,7 +4,8 @@ import plotly.express as px
 from pytorch_forecasting import Baseline
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from DataBuilders.synthetic import Params
+from DataBuilders.electricity import Params
+import pandas as pd
 
 
 def plot_volume_by_group(data, agency=None, sku=None):
@@ -21,19 +22,23 @@ def plot_volume_by_group(data, agency=None, sku=None):
     del df
 
 
-def plot_predictions(model, test_dataloader):
+def plot_predictions(model, dataloader, df):
     plot_name = DataConst.DATASET_NAME
-    raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
-    index_df = test_dataloader.dataset.x_to_index(x)
-    idx_list = list(index_df[index_df.time_idx.isin(list(range(1591, 1769, 30)))].index)
-
-    x_values_enc = list(range(-DataConst.ENCODER_LENGTH, 0))
-    x_values_pred = list(range(0, DataConst.PREDICTION_LENGTH))
+    raw_predictions, x = model.predict(dataloader, mode="raw", return_x=True)
+    index_df = dataloader.dataset.x_to_index(x)
+    time_idx_min = index_df.time_idx.min()
+    time_idx_max = index_df.time_idx.max()
+    idx_list = list(index_df[index_df.time_idx.isin(list(range(time_idx_min,
+                                                               time_idx_max,
+                                                               Params.PREDICTION_LENGTH
+                                                               )))].index)
 
     interpretation = model.interpret_output(raw_predictions, attention_prediction_horizon=0)
     prediction_idx = raw_predictions['prediction'][0].shape[1] // 2
     for idx in idx_list:
         time_idx, sensor = index_df.iloc[idx].values
+        x_values_enc = pd.DatetimeIndex(df[(df.time_idx <= time_idx) & (df.time_idx >= time_idx - Params.ENCODER_LENGTH)]['date'].unique())
+        x_values_pred = pd.DatetimeIndex(df[(df.time_idx > time_idx) & (df.time_idx <= time_idx + Params.PREDICTION_LENGTH)]['date'].unique())
         fig = make_subplots(specs=[[{"secondary_y": True}]])
 
         actual_enc = x['encoder_target'][idx]
@@ -56,13 +61,14 @@ def plot_predictions(model, test_dataloader):
 
         attention = interpretation["attention"][idx]
         fig.add_trace(
-            go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='gray')),
+            go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='lightgrey')),
             secondary_y=True,
         )
 
         y_lower_quantile = raw_predictions['prediction'][idx][:, 0]
         fig.add_trace(
-            go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile", line=dict(color='grey', dash='dash')),
+            go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile",
+                       line=dict(color='grey', dash='dash')),
             secondary_y=False,
         )
 
@@ -78,7 +84,8 @@ def plot_predictions(model, test_dataloader):
         fig.update_yaxes(title_text="<b>Actual VS Prediction</b>", secondary_y=False)
         fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
 
-        fig.write_html('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.html')
+        # fig.write_html('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.html')
+        fig.write_image('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.png', engine='kaleido')
 
     interpretation = model.interpret_output(raw_predictions, reduction="sum", attention_prediction_horizon=0)
     figs = model.plot_interpretation(interpretation)
@@ -102,10 +109,10 @@ def plot_baseline_predictions(test_dataloader):
 
 def plot_synthetic_predictions(model, test_dataloader):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
-            Series=Params.SERIES,
-            Seasonality=Params.SEASONALITY,
-            Trend=Params.TREND
-        ).replace('.', '')
+        Series=Params.SERIES,
+        Seasonality=Params.SEASONALITY,
+        Trend=Params.TREND
+    ).replace('.', '')
 
     raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
     index_df = test_dataloader.dataset.x_to_index(x)
@@ -133,10 +140,10 @@ def plot_data(dataset_name, data):
 
 def plot_synthetic_data(data):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
-            Series=Params.SERIES,
-            Seasonality=Params.SEASONALITY,
-            Trend=Params.TREND
-        ).replace('.', '')
+        Series=Params.SERIES,
+        Seasonality=Params.SEASONALITY,
+        Trend=Params.TREND
+    ).replace('.', '')
 
     fig = px.line(data, y="value", x="time_idx", color='series')
     fig.write_html(plot_name)
