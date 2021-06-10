@@ -1,7 +1,7 @@
 import pandas as pd
 from pytorch_forecasting.data.examples import generate_ar_data
 from pytorch_forecasting import TimeSeriesDataSet
-from constants import DataConst
+from config import DataConst
 from data_utils import add_dt_columns
 from DataBuilders.data_builder import DataBuilder
 

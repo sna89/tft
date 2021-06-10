@@ -1,6 +1,6 @@
 from pytorch_forecasting.data.examples import get_stallion_data
 from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer
-from constants import DataConst
+from config import DataConst
 from data_utils import add_dt_columns, add_log_column
 from DataBuilders.data_builder import DataBuilder
 

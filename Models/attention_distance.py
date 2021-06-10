@@ -1,4 +1,4 @@
-from constants import DataConst
+from config import DataConst
 from typing import List
 import numpy as np
 import torch

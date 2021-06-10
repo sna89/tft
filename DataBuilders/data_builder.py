@@ -19,8 +19,7 @@ class DataBuilder(ABC):
         test_ts_ds = TimeSeriesDataSet.from_parameters(parameters, test_df)
         return train_df, validation_df, test_df, train_ts_ds, validation_ts_ds, test_ts_ds
 
-    @staticmethod
-    def get_data():
+    def get_data(self):
         raise NotImplementedError
 
     @staticmethod

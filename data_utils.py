@@ -40,4 +40,8 @@ def add_log_column(data, col_name):
     data[new_col_name] = np.log(data[col_name])
 
 
+def get_dataloader(ts_ds, is_train, config):
+    dataloader = ts_ds.to_dataloader(train=is_train, batch_size=config["Train"].get("BatchSize"),
+                                     num_workers=config["Train"].get("CPU"))
+    return dataloader
 

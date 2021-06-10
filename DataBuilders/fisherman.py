@@ -1,7 +1,7 @@
 import datetime
 from datetime import timedelta
 import os
-from constants import Paths, DataConst
+from config import Paths, DataConst
 import pandas as pd
 from data_utils import filter_df_by_date, add_dt_columns
 from pytorch_forecasting import TimeSeriesDataSet

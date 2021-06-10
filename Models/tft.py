@@ -53,7 +53,7 @@ def fit(trainer, model, train_dl, val_dl):
 
 def get_fitted_model(trainer):
     # best_model_path = trainer.checkpoint_callback.best_model_path
-    best_model_path = 'tb_logs/my_model/version_11/checkpoints/epoch=12-step=5147.ckpt'
+    best_model_path = 'tb_logs/my_model/version_16/checkpoints/epoch=14-step=2969.ckpt'
     best_tft = TemporalFusionTransformer.load_from_checkpoint(best_model_path)
     return best_tft
 
