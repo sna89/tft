@@ -1,7 +1,7 @@
 from DataBuilders.fisherman import FishermanDataBuilder
 from DataBuilders.stallion import StallionDataBuilder
 from DataBuilders.synthetic import SyntheticDataBuilder
-from DataBuilders.electricity import ElectrictyDataBuilder
+from DataBuilders.electricity import ElectricityDataBuilder
 
 
 def get_data_helper(dataset_name):
@@ -12,6 +12,6 @@ def get_data_helper(dataset_name):
     elif dataset_name == "stallion":
         return StallionDataBuilder()
     elif dataset_name == "electricity":
-        return ElectrictyDataBuilder()
+        return ElectricityDataBuilder()
     else:
         raise ValueError()

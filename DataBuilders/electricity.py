@@ -4,20 +4,26 @@ import numpy as np
 from constants import Paths
 import os
 from data_utils import add_dt_columns
+from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer
+from pytorch_forecasting.data.encoders import NaNLabelEncoder
 
 
 class Params:
     TOTAL_NUM_COLUMNS = 371
-    COLUMN_FILTER_INDEX = 21
+    COLUMN_FILTER_INDEX = 3
     FILENAME = os.path.join(Paths.ELECTRICITY, 'LD2011_2014.txt')
     CHUNKSIZE = 10000
     RAW_DF_COLUMN_PREFIX = 'MT_'
     PROCESSED_DF_COLUMN_NAMES = ['date', 'group', 'value']
+    ENCODER_LENGTH = 168
+    PREDICTION_LENGTH = 24
+    TRAIN_RATIO = 0.6
+    VAL_RATIO = 0.2
 
 
-class ElectrictyDataBuilder(DataBuilder):
-    def __init__(self):
-        super().__init__()
+class ElectricityDataBuilder(DataBuilder):
+    def __init__(self, train_ratio, val_ratio, enc_length, prediction_length):
+        super(ElectricityDataBuilder, self).__init__(train_ratio, val_ratio, enc_length, prediction_length)
 
     @staticmethod
     def get_data():
@@ -47,13 +53,14 @@ class ElectrictyDataBuilder(DataBuilder):
             df_batch = df_batch[df_batch.group.isin(filtered_user_col_names)].reset_index(drop=True)
             dfs.append(df_batch)
         df = pd.concat(dfs, axis=0)
-        df = df[df.date >= "2012-01-01"]
-        return df.reset_index(drop=True)
+        df = df[(df.date >= "2012-01-01") & (df.date < "2014-01-01")]
+        df.reset_index(drop=True, inplace=True)
+        return df
 
     @staticmethod
     def preprocess(data):
-        data = add_dt_columns(data, ['hour', 'day_of_week', 'day_of_month', 'month', 'year', 'is_weekend'])
-        data = ElectrictyDataBuilder.add_time_idx_column(data)
+        data = add_dt_columns(data, ['hour', 'day_of_week', 'day_of_month', 'month'])
+        data = ElectricityDataBuilder.add_time_idx_column(data)
         return data
 
     @staticmethod
@@ -65,13 +72,36 @@ class ElectrictyDataBuilder(DataBuilder):
         data['time_idx'] -= data.time_idx.min()
         return data
 
-    @staticmethod
-    def define_ts_ds(train_df):
-        pass
+    def define_ts_ds(self, train_df):
+        electricity_train_ts_ds = TimeSeriesDataSet(
+            train_df,
+            time_idx="time_idx",
+            group_ids=[Params.PROCESSED_DF_COLUMN_NAMES[1]],
+            target=Params.PROCESSED_DF_COLUMN_NAMES[2],
+            min_encoder_length=self.enc_length,
+            max_encoder_length=self.enc_length,
+            min_prediction_length=self.prediction_length,
+            max_prediction_length=self.prediction_length,
+            static_categoricals=[Params.PROCESSED_DF_COLUMN_NAMES[1]],
+            time_varying_known_categoricals=['hour', 'day_of_week', 'day_of_month', 'month'],
+            time_varying_known_reals=['time_idx'],
+            time_varying_unknown_categoricals=[],
+            time_varying_unknown_reals=[Params.PROCESSED_DF_COLUMN_NAMES[2]],
+            # target_normalizer=GroupNormalizer(
+            #     groups=[Params.PROCESSED_DF_COLUMN_NAMES[1]]
+            #     # ,transformation="softplus"
+            # ),
+            add_relative_time_idx=True,
+            add_target_scales=True,
+            add_encoder_length=True,
+            allow_missings=True
+        )
+        return electricity_train_ts_ds
 
 
 if __name__ == "__main__":
-    data_helper = ElectrictyDataBuilder()
-    data = data_helper.get_data()
-    data = data_helper.preprocess(data)
-    print(data.head(100))
+    data_helper = ElectricityDataBuilder(Params.TRAIN_RATIO,
+                                         Params.VAL_RATIO,
+                                         Params.ENCODER_LENGTH,
+                                         Params.PREDICTION_LENGTH)
+    train_df, validation_df, test_df, train_ts_ds, validation_ts_ds, test_ts_ds = data_helper.build_ts_data()
