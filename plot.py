@@ -21,8 +21,8 @@ def plot_volume_by_group(data, agency=None, sku=None):
     del df
 
 
-def plot_fisherman_predictions(model, test_dataloader):
-    plot_name = 'fisherman_predictions'
+def plot_predictions(model, test_dataloader):
+    plot_name = DataConst.DATASET_NAME
     raw_predictions, x = model.predict(test_dataloader, mode="raw", return_x=True)
     index_df = test_dataloader.dataset.x_to_index(x)
     idx_list = list(index_df[index_df.time_idx.isin(list(range(1591, 1769, 30)))].index)

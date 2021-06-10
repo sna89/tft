@@ -11,7 +11,7 @@ def get_data_helper(dataset_name):
         return SyntheticDataBuilder()
     elif dataset_name == "stallion":
         return StallionDataBuilder()
-    elif dataset_name == "electricity":
+    elif dataset_name == "Electricity":
         return ElectricityDataBuilder()
     else:
         raise ValueError()
