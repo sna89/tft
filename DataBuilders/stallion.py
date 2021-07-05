@@ -1,6 +1,5 @@
 from pytorch_forecasting.data.examples import get_stallion_data
 from pytorch_forecasting import TimeSeriesDataSet, GroupNormalizer
-from config import DataConst
 from data_utils import add_dt_columns, add_log_column
 from DataBuilders.data_builder import DataBuilder
 
@@ -54,19 +53,18 @@ class StallionDataBuilder(DataBuilder):
         add_log_column(data, 'soda_volume')
         return data
 
-    @staticmethod
-    def define_ts_ds(train_df):
+    def define_ts_ds(self, train_df):
         special_days = StallionDataBuilder.get_special_days()
         stallion_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
             target="volume",
             group_ids=["agency", "sku"],
-            min_encoder_length=DataConst.ENCODER_LENGTH,
+            min_encoder_length=self.enc_length,
             # keep encoder length long (as it is in the validation set)
-            max_encoder_length=DataConst.ENCODER_LENGTH,
-            min_prediction_length=DataConst.PREDICTION_LENGTH,
-            max_prediction_length=DataConst.PREDICTION_LENGTH,
+            max_encoder_length=self.enc_length,
+            min_prediction_length=self.prediction_length,
+            max_prediction_length=self.prediction_length,
             static_categoricals=["agency", "sku"],
             static_reals=["avg_population_2017", "avg_yearly_household_income_2017"],
             time_varying_known_categoricals=["special_days", "month"],

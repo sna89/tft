@@ -1,7 +1,7 @@
 import datetime
 from datetime import timedelta
 import os
-from config import Paths, DataConst
+# from config import Paths, DataConst
 import pandas as pd
 from data_utils import filter_df_by_date, add_dt_columns
 from pytorch_forecasting import TimeSeriesDataSet
@@ -9,8 +9,8 @@ from DataBuilders.data_builder import DataBuilder
 
 
 class FishermanDataBuilder(DataBuilder):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config):
+        super(FishermanDataBuilder).__init__(config)
 
     @staticmethod
     def get_data():

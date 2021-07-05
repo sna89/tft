@@ -4,6 +4,9 @@ from pytorch_forecasting import Baseline
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
+import os
+
+BASE_FOLDER = os.path.join("tmp", "pycharm_project_99")
 
 
 def plot_volume_by_group(data, agency=None, sku=None):
@@ -34,8 +37,10 @@ def plot_predictions(model, dataloader, df, config, dataset_name):
     prediction_idx = raw_predictions['prediction'][0].shape[1] // 2
     for idx in idx_list:
         time_idx, sensor = index_df.iloc[idx].values
-        x_values_enc = pd.DatetimeIndex(df[(df.time_idx <= time_idx) & (df.time_idx >= time_idx - config.get("EncoderLength"))]['date'].unique())
-        x_values_pred = pd.DatetimeIndex(df[(df.time_idx > time_idx) & (df.time_idx <= time_idx + config.get("PredictionLength"))]['date'].unique())
+        x_values_enc = pd.DatetimeIndex(
+            df[(df.time_idx <= time_idx) & (df.time_idx >= time_idx - config.get("EncoderLength"))]['date'].unique())
+        x_values_pred = pd.DatetimeIndex(
+            df[(df.time_idx > time_idx) & (df.time_idx <= time_idx + config.get("PredictionLength"))]['date'].unique())
         fig = make_subplots(specs=[[{"secondary_y": True}]])
 
         actual_enc = x['encoder_target'][idx]
@@ -82,14 +87,17 @@ def plot_predictions(model, dataloader, df, config, dataset_name):
         fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
 
         # fig.write_html('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.html')
-        fig.write_image('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.png', engine='kaleido')
+        fig.write_image(os.path.join('Plots',
+                                     dataset_name,
+                                     'prediction_sensor_' + str(sensor) + '_' + str(time_idx) + '.png'),
+                        engine='kaleido')
 
     interpretation = model.interpret_output(raw_predictions, reduction="sum", attention_prediction_horizon=0)
     figs = model.plot_interpretation(interpretation)
-    figs['attention'].figure.savefig('plots/' + 'attention_' + dataset_name)
-    figs['static_variables'].figure.savefig('plots/' + 'static_variables_' + dataset_name)
-    figs['encoder_variables'].figure.savefig('plots/' + 'encoder_variables_' + dataset_name)
-    figs['decoder_variables'].figure.savefig('plots/' + 'decoder_variables_' + dataset_name)
+    figs['attention'].figure.savefig(os.path.join('Plots', dataset_name, 'attention.png'))
+    figs['static_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'static_variables.png'))
+    figs['encoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'encoder_variables.png'))
+    figs['decoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'decoder_variables.png'))
 
 
 def plot_baseline_predictions(test_dataloader):
@@ -135,17 +143,16 @@ def plot_baseline_predictions(test_dataloader):
 #         plot_fisherman_data(data)
 
 
-# def plot_synthetic_data(data):
-#     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend'.format(
-#         Series=Params.SERIES,
-#         Seasonality=Params.SEASONALITY,
-#         Trend=Params.TREND
-#     ).replace('.', '')
-#
-#     fig = px.line(data, y="value", x="time_idx", color='series')
-#     fig.write_html(plot_name)
+def plot_synthetic_data(config, data):
+    plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend.html'.format(
+        Series=config.get("Series"),
+        Seasonality=config.get("Seasonality"),
+        Trend=config.get("Trend")
+    )
+    data_to_plot = data.drop_duplicates(subset=["time_idx", "series"])
+    fig = px.line(data_to_plot, y="value", x="time_idx", color='series')
+    fig.write_html(plot_name)
 
-#
 # def plot_fisherman_data(data):
 #     # data_ = data[data.Type == 'internaltemp']
 #     fig = px.line(data, y="Value", x="time_idx", color='Sensor')

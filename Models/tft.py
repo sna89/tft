@@ -5,6 +5,8 @@ from pytorch_forecasting import TemporalFusionTransformer
 from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_forecasting.models.temporal_fusion_transformer.tuning import optimize_hyperparameters
 from pytorch_forecasting import TimeSeriesDataSet
+import pickle
+import os
 
 
 def create_trainer():
@@ -13,32 +15,72 @@ def create_trainer():
     lr_logger = LearningRateMonitor(logging_interval='step')  # log the learning rate
 
     trainer = pl.Trainer(
-        gpus=1,
+        gpus=2,
         max_epochs=200,
         # gradient_clip_val=0.1,
         callbacks=[lr_logger, early_stop_callback],
         logger=logger,
-        # accelerator="ddp"
+        accelerator="ddp"
     )
     return trainer
 
 
-def create_tft_model(training_data: TimeSeriesDataSet):
-    tft = TemporalFusionTransformer.from_dataset(
-        training_data,
-        # not meaningful for finding the learning rate but otherwise very important
-        learning_rate=0.0001,
-        hidden_size=128,  # most important hyperparameter apart from learning rate
-        # number of attention heads. Set to up to 4 for large datasets
-        attention_head_size=2,
-        dropout=0.1,  # between 0.1 and 0.3 are good values
-        hidden_continuous_size=16,  # set to <= hidden_size
-        output_size=7,  # 7 quantiles by default
-        loss=QuantileLoss([0.005, 0.1, 0.25, 0.5, 0.75, 0.9, 0.995]),
-        # reduce learning rate if no improvement in validation loss after x epochs
-        reduce_on_plateau_patience=2,
-        log_interval=1
-    )
+def optimize_tft_hp(config, train_dl, val_dl):
+    study_full_path = os.path.join(config.get("StudyPath"), "study.pkl")
+
+    if not os.path.isfile(study_full_path):
+        study = optimize_hyperparameters(
+            train_dl,
+            val_dl,
+            model_path=config.get("StudyPath"),
+            n_trials=25,
+            max_epochs=10,
+            gradient_clip_val_range=(0.01, 1.0),
+            hidden_size_range=(8, 128),
+            hidden_continuous_size_range=(8, 128),
+            attention_head_size_range=(1, 4),
+            learning_rate_range=(0.001, 0.1),
+            dropout_range=(0.1, 0.3),
+            trainer_kwargs=dict(limit_train_batches=30),
+            reduce_on_plateau_patience=4,
+            use_learning_rate_finder=False,
+        )
+
+        with open(study_full_path, "wb") as f:
+            pickle.dump(study, f)
+
+    else:
+        with open(study_full_path, "rb") as f:
+            study = pickle.load(f)
+
+    return study
+
+
+def create_tft_model(training_data: TimeSeriesDataSet, study=None):
+    if study:
+        params = study.best_params
+        del params['gradient_clip_val']
+
+        tft = TemporalFusionTransformer.from_dataset(
+            training_data,
+            params
+        )
+    else:
+        tft = TemporalFusionTransformer.from_dataset(
+            training_data,
+            # not meaningful for finding the learning rate but otherwise very important
+            learning_rate=0.0001,
+            hidden_size=128,  # most important hyperparameter apart from learning rate
+            # number of attention heads. Set to up to 4 for large datasets
+            attention_head_size=2,
+            dropout=0.1,  # between 0.1 and 0.3 are good values
+            hidden_continuous_size=16,  # set to <= hidden_size
+            output_size=7,  # 7 quantiles by default
+            loss=QuantileLoss([0.005, 0.1, 0.25, 0.5, 0.75, 0.9, 0.995]),
+            # reduce learning rate if no improvement in validation loss after x epochs
+            reduce_on_plateau_patience=2,
+            log_interval=1
+        )
     return tft
 
 
@@ -53,7 +95,7 @@ def fit(trainer, model, train_dl, val_dl):
 
 def get_fitted_model(trainer):
     # best_model_path = trainer.checkpoint_callback.best_model_path
-    best_model_path = 'tb_logs/my_model/version_16/checkpoints/epoch=14-step=2969.ckpt'
+    best_model_path = 'tb_logs/my_model/version_0/checkpoints/epoch=58-step=707.ckpt'
     best_tft = TemporalFusionTransformer.load_from_checkpoint(best_model_path)
     return best_tft
 

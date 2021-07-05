@@ -2,6 +2,7 @@ import os
 import multiprocessing
 
 BASE_FOLDER = os.path.join('Data')
+STUDY_BASE_FOLDER = os.path.join('Study')
 
 
 def get_config(dataset_name):
@@ -21,11 +22,15 @@ def get_config(dataset_name):
             "PredictionLength": 20
         },
         "Synthetic": {
-            "EncoderLength": 100,
-            "PredictionLength": 50,
-            "Series": 1,
+            "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
+            "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
+            "EncoderLength": 30,
+            "PredictionLength": 10,
+            "Series": 10,
             "Seasonality": 30,
-            "Trend": 2
+            "Trend": 2,
+            "Noise": 0.05,
+            "Timesteps": 600
         },
         "Stallion": {
             "EncoderLength": 14,
@@ -42,6 +47,52 @@ def get_config(dataset_name):
         }
     }
 
-    config = dict(dataset_config[dataset_name], **train_config)
+    anomaly_config = {
+        "AnomalyConfig":
+            {
+                "series_0": {
+                    "lb": -0.5,
+                    "hb": 0.5,
+                },
+                "series_1": {
+                    "lb": -0.3,
+                    "hb": 0.3,
+                },
+                "series_2": {
+                    "lb": -1.5,
+                    "hb": 0.5,
+                },
+                "series_3": {
+                    "lb": -1,
+                    "hb": 5,
+                },
+                "series_4": {
+                    "lb": -1,
+                    "hb": 2,
+                },
+                "series_5": {
+                    "lb": -1,
+                    "hb": 1,
+                },
+                "series_6": {
+                    "lb": -0.5,
+                    "hb": 0.5,
+                },
+                "series_7": {
+                    "lb": -0.1,
+                    "hb": 0.1,
+                },
+                "series_8": {
+                    "lb": -0.5,
+                    "hb": 0.5,
+                },
+                "series_9": {
+                    "lb": -0.3,
+                    "hb": 1,
+                }
+            }
+    }
+
+    config = dict(dict(dataset_config[dataset_name], **train_config), **anomaly_config)
 
     return config
