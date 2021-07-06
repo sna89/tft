@@ -25,7 +25,7 @@ def get_config(dataset_name):
             "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
             "EncoderLength": 30,
-            "PredictionLength": 10,
+            "PredictionLength": 6,
             "Series": 10,
             "Seasonality": 30,
             "Trend": 2,
@@ -90,7 +90,15 @@ def get_config(dataset_name):
                     "lb": -0.3,
                     "hb": 1,
                 }
-            }
+            },
+        "Rewards": {
+            "MissedAlert": -1000,
+            "FalseAlert": -100,
+            "GoodAlert": 10,
+        },
+        "Env": {
+            "AlertPredictionSteps": 6
+        }
     }
 
     config = dict(dict(dataset_config[dataset_name], **train_config), **anomaly_config)

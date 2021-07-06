@@ -63,7 +63,9 @@ def create_tft_model(training_data: TimeSeriesDataSet, study=None):
 
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
-            params
+            params,
+            output_size=5,
+            loss=QuantileLoss([0.1, 0.3, 0.5, 0.7, 0.9]),
         )
     else:
         tft = TemporalFusionTransformer.from_dataset(
@@ -75,8 +77,8 @@ def create_tft_model(training_data: TimeSeriesDataSet, study=None):
             attention_head_size=2,
             dropout=0.1,  # between 0.1 and 0.3 are good values
             hidden_continuous_size=16,  # set to <= hidden_size
-            output_size=7,  # 7 quantiles by default
-            loss=QuantileLoss([0.005, 0.1, 0.25, 0.5, 0.75, 0.9, 0.995]),
+            output_size=5,
+            loss=QuantileLoss([0.1, 0.3, 0.5, 0.7, 0.9]),
             # reduce learning rate if no improvement in validation loss after x epochs
             reduce_on_plateau_patience=2,
             log_interval=1
@@ -93,11 +95,13 @@ def fit(trainer, model, train_dl, val_dl):
     return trainer
 
 
-def get_fitted_model(trainer):
-    # best_model_path = trainer.checkpoint_callback.best_model_path
-    best_model_path = 'tb_logs/my_model/version_0/checkpoints/epoch=58-step=707.ckpt'
-    best_tft = TemporalFusionTransformer.load_from_checkpoint(best_model_path)
+def get_model_from_trainer(trainer):
+    best_model_path = trainer.checkpoint_callback.best_model_path
+    best_tft = get_model_from_checkpoint(best_model_path)
     return best_tft
 
 
+def get_model_from_checkpoint(checkpoint):
+    best_tft = TemporalFusionTransformer.load_from_checkpoint(checkpoint)
+    return best_tft
 
