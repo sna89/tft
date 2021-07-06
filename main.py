@@ -9,6 +9,8 @@ from data_utils import get_dataloader
 import os
 from data_factory import get_data_builder
 import gym
+from utils import save_to_pickle
+
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
@@ -16,7 +18,6 @@ pd.set_option('display.max_columns', None)
 
 def build_data(config, dataset_name):
     data_builder = get_data_builder(config, dataset_name)
-
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds = data_builder.build_ts_data()
     train_dl = get_dataloader(train_ts_ds, is_train=True, config=config)
     val_dl = get_dataloader(val_ts_ds, is_train=False, config=config)
@@ -41,7 +42,10 @@ if __name__ == '__main__':
     config = get_config(dataset_name)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl\
         = build_data(config, dataset_name)
-    fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
-    tft_env = gym.make("gym_ad_tft:tft-v0")
+    # save_to_pickle(test_ts_ds, config.get("TestDatasetPicklePath"))
+    save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
+    # fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name)
     # evaluate(fitted_model, test_dl)
+    tft_env = gym.make("gym_ad_tft:tft-v0")
+    tft_env.step(0)

@@ -23,6 +23,8 @@ def get_config(dataset_name):
         },
         "Synthetic": {
             "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
+            "TestTSDatasetPicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_ts_ds.pkl'),
+            "TestDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_df.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
             "EncoderLength": 30,
             "PredictionLength": 6,

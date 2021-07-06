@@ -5,7 +5,7 @@ from pytorch_forecasting import TemporalFusionTransformer
 from pytorch_forecasting.metrics import QuantileLoss
 from pytorch_forecasting.models.temporal_fusion_transformer.tuning import optimize_hyperparameters
 from pytorch_forecasting import TimeSeriesDataSet
-import pickle
+from utils import save_to_pickle, load_pickle
 import os
 
 
@@ -45,13 +45,9 @@ def optimize_tft_hp(config, train_dl, val_dl):
             reduce_on_plateau_patience=4,
             use_learning_rate_finder=False,
         )
-
-        with open(study_full_path, "wb") as f:
-            pickle.dump(study, f)
-
+        save_to_pickle(study, study_full_path)
     else:
-        with open(study_full_path, "rb") as f:
-            study = pickle.load(f)
+        study = load_pickle(study_full_path)
 
     return study
 
