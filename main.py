@@ -10,6 +10,7 @@ import os
 from data_factory import get_data_builder
 import gym
 from utils import save_to_pickle
+from thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
 
 
 warnings.filterwarnings("ignore")
@@ -42,10 +43,11 @@ if __name__ == '__main__':
     config = get_config(dataset_name)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl\
         = build_data(config, dataset_name)
-    # save_to_pickle(test_ts_ds, config.get("TestDatasetPicklePath"))
-    save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
-    # fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
+    save_to_pickle(val_ts_ds, config.get("ValTSDatasetPicklePath"))
+    save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
+    fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name)
     # evaluate(fitted_model, test_dl)
     tft_env = gym.make("gym_ad_tft:tft-v0")
-    tft_env.step(0)
+    thts = TrialBasedHeuristicTree(tft_env, config)
+    thts.run()

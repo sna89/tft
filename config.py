@@ -1,5 +1,7 @@
 import os
 import multiprocessing
+import numpy as np
+
 
 BASE_FOLDER = os.path.join('Data')
 STUDY_BASE_FOLDER = os.path.join('Study')
@@ -23,11 +25,11 @@ def get_config(dataset_name):
         },
         "Synthetic": {
             "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
-            "TestTSDatasetPicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_ts_ds.pkl'),
-            "TestDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_df.pkl'),
+            "ValTSDatasetPicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'val_ts_ds.pkl'),
+            "ValDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'val_df.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
             "EncoderLength": 30,
-            "PredictionLength": 6,
+            "PredictionLength": 1,
             "Series": 10,
             "Seasonality": 30,
             "Trend": 2,
@@ -93,14 +95,21 @@ def get_config(dataset_name):
                     "hb": 1,
                 }
             },
-        "Rewards": {
-            "MissedAlert": -1000,
-            "FalseAlert": -100,
-            "GoodAlert": 10,
-        },
         "Env": {
-            "AlertPredictionSteps": 6
+            "AlertPredictionSteps": 6,
+            "Rewards": {
+                "MissedAlert": -1000,
+                "FalseAlert": -100,
+                "GoodAlert": 10,
+            }
+        },
+        "THTS": {
+            "NumTrials": 2000,
+            "TrialLength": 18,
+            "UCTBias": np.sqrt(2),
+            "Runs": 1
         }
+
     }
 
     config = dict(dict(dataset_config[dataset_name], **train_config), **anomaly_config)
