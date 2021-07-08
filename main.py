@@ -12,7 +12,6 @@ import gym
 from utils import save_to_pickle
 from thts.max_uct import MaxUCT
 
-
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
 
@@ -41,13 +40,13 @@ def optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, to_fit=False):
 if __name__ == '__main__':
     dataset_name = os.getenv("DATASET")
     config = get_config(dataset_name)
-    train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl\
+    train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl \
         = build_data(config, dataset_name)
-    save_to_pickle(val_ts_ds, config.get("ValTSDatasetPicklePath"))
     save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
+    save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name)
     # evaluate(fitted_model, test_dl)
     tft_env = gym.make("gym_ad_tft:tft-v0")
     thts = MaxUCT(tft_env, config)
-    thts.run()
+    thts.run(test_df)

@@ -30,15 +30,15 @@ class EnvState:
 class AdTftEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, config, tft_model, val_ts_ds, val_df):
+    def __init__(self, config, tft_model, val_df, test_df):
         self.config = config
 
         self.tft_model = tft_model
         self.model_pred_len = self.config.get("PredictionLength")
         self.model_enc_len = self.config.get("EncoderLength")
 
-        self.val_ts_ds = val_ts_ds
         self.val_df = val_df
+        self.test_df = test_df
         self.last_date = self._get_last_date(self.val_df)
         self.last_time_idx = self._get_last_time_idx(self.val_df)
 
@@ -73,7 +73,7 @@ class AdTftEnv(gym.Env):
         prob = 1 / float(self._get_num_quantiles())
         return next_state, reward, terminal, prob
 
-    def sample_from_prediction(self, raw_prediction):
+    def _sample_from_prediction(self, raw_prediction):
         quantile_prediction = raw_prediction["prediction"]
         num_quantiles = self._get_num_quantiles()
         quantile_idx = random.choice(list(range(num_quantiles)))
@@ -109,7 +109,7 @@ class AdTftEnv(gym.Env):
     def render(self, mode='human'):
         pass
 
-    def build_prediction_df(self):
+    def _build_prediction_df(self):
         prediction_df = self.val_df
         for current_series_info in self.current_state.env_state:
             for idx, value in enumerate(current_series_info.history[1:], start=1):
@@ -188,9 +188,9 @@ class AdTftEnv(gym.Env):
         return self.reward_good_alert * (self.max_steps_from_alert - steps_from_alert)
 
     def _predict_next_state(self):
-        prediction_df = self.build_prediction_df()
+        prediction_df = self._build_prediction_df()
         raw_prediction, x = self.tft_model.predict(prediction_df, mode="raw", return_x=True)
-        prediction = self.sample_from_prediction(raw_prediction)
+        prediction = self._sample_from_prediction(raw_prediction)
         return prediction
 
     def _build_next_state(self, prediction, steps_from_alert):

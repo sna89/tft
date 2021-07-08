@@ -25,7 +25,7 @@ def get_config(dataset_name):
         },
         "Synthetic": {
             "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
-            "ValTSDatasetPicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'val_ts_ds.pkl'),
+            "TestDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_df.pkl'),
             "ValDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'val_df.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
             "EncoderLength": 30,
@@ -104,8 +104,8 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 10,
-            "TrialLength": 6,
+            "NumTrials": 1,
+            "TrialLength": 1,
             "UCTBias": np.sqrt(2),
             "Runs": 1
         }
