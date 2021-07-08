@@ -104,8 +104,8 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 2000,
-            "TrialLength": 18,
+            "NumTrials": 10,
+            "TrialLength": 6,
             "UCTBias": np.sqrt(2),
             "Runs": 1
         }

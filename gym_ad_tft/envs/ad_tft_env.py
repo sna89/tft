@@ -58,26 +58,44 @@ class AdTftEnv(gym.Env):
         self.reset()
 
     def step(self, action):
-        prediction_df = self.build_prediction_df()
-        raw_predictions, x = self.tft_model.predict(prediction_df, mode="raw", return_x=True)
-        predictions = self.sample_from_predictions(raw_predictions)
-        prob = self.calc_sample_probability(raw_predictions)
-        reward = self.calc_reward(predictions)
-        #return next_state, reward, terminal, prob
+        assert action in self.action_space, "Action must be part of action space"
+        assert (
+                       self.min_steps_from_alert <= self.current_state.steps_from_alert < self.max_steps_from_alert and action == 0) \
+               or (self.current_state.steps_from_alert == self.max_steps_from_alert and action in self.action_space), \
+            "{}_{}".format(self.current_state.steps_from_alert, action)
 
-    @staticmethod
-    def sample_from_predictions(raw_predictions):
-        qauntile_predictions = raw_predictions["prediction"]
-        num_quantiles = len(qauntile_predictions[0][0])
+        steps_from_alert = self.current_state.steps_from_alert
+        prediction = self._predict_next_state()
+        if action == 1 or self.current_state.steps_from_alert < self.max_steps_from_alert:
+            steps_from_alert -= 1
+        reward, terminal = self._get_reward_and_terminal(prediction, steps_from_alert)
+        next_state = self._build_next_state(prediction, steps_from_alert)
+        prob = 1 / float(self._get_num_quantiles())
+        return next_state, reward, terminal, prob
+
+    def sample_from_prediction(self, raw_prediction):
+        quantile_prediction = raw_prediction["prediction"]
+        num_quantiles = self._get_num_quantiles()
         quantile_idx = random.choice(list(range(num_quantiles)))
-        predictions = list(map(lambda x: x[0][0][quantile_idx], qauntile_predictions.unsqueeze(1)))
-        return predictions
+        prediction = list(map(lambda x: x[0][0][quantile_idx], quantile_prediction.unsqueeze(1)))
+        return prediction
 
-    def calc_reward(self, predictions):
-        return 0
-
-    def calc_sample_probability(self, raw_predictions):
-        return 0
+    def _get_reward_and_terminal(self, prediction, steps_from_alert):
+        reward = 0
+        terminal = False
+        for num_series in range(len(prediction)):
+            bounds = self.config.get("AnomalyConfig").get("series_{}".format(num_series))
+            lb, hb = bounds.values()
+            series_prediction = prediction[num_series]
+            if self._is_missed_alert(lb, hb, series_prediction, steps_from_alert):
+                reward += self.reward_missed_alert
+                terminal = True
+            if self._is_false_alert(lb, hb, series_prediction, steps_from_alert):
+                reward += self.reward_false_alert
+            if self._is_good_alert(lb, hb, series_prediction, steps_from_alert):
+                reward += self._calc_good_alert_reward(steps_from_alert)
+                terminal = True
+        return reward, terminal
 
     def reset(self):
         self.current_state.env_state.clear()
@@ -94,22 +112,24 @@ class AdTftEnv(gym.Env):
     def build_prediction_df(self):
         prediction_df = self.val_df
         for current_series_info in self.current_state.env_state:
-            for idx, value in enumerate(current_series_info.history, start=1):
+            for idx, value in enumerate(current_series_info.history[1:], start=1):
                 series = current_series_info.series
-                prediction_df = self._add_history_sample_to_prediction_df(prediction_df, value, series, idx)
+                prediction_df = self._add_sample_to_prediction_df(prediction_df, value, series, idx)
 
+        prediction_df = self._add_current_state_to_prediction_df(prediction_df)
         prediction_df = self._add_dummy_sample_to_prediction_df(prediction_df)
+
         prediction_df.reset_index(drop=True, inplace=True)
         prediction_df.sort_values(by=['series', 'time_idx'], axis=0, inplace=True)
         return prediction_df
 
-    def _add_history_sample_to_prediction_df(self, prediction_df, value, series, idx):
+    def _add_sample_to_prediction_df(self, prediction_df, value, series, idx_diff):
         data = {'series': series,
                 'value': value,
-                'date': self.last_date + datetime.timedelta(days=idx),
-                'time_idx': self.last_time_idx + idx
+                'date': self.last_date + datetime.timedelta(days=idx_diff),
+                'time_idx': self.last_time_idx + idx_diff
                 }
-        data_df = pd.DataFrame.from_dict(data)
+        data_df = pd.DataFrame(data, index=[0])
         data_df['day_of_month'] = data_df.date.dt.day.astype(str).astype("category")
         data_df['month'] = data_df.date.dt.month.astype(str).astype("category")
         prediction_df = pd.concat([prediction_df, data_df], axis=0)
@@ -118,49 +138,73 @@ class AdTftEnv(gym.Env):
     def _add_dummy_sample_to_prediction_df(self, prediction_df):
         last_time_idx = self._get_last_time_idx(prediction_df)
         dummy_data = prediction_df[lambda x: x.time_idx == last_time_idx]
+        idx_diff = len(self.current_state.env_state[0].history) + 1
 
-        dummy_time_idx = last_time_idx + 1
-        dummy_data['time_idx'] = dummy_time_idx
+        num_series = list(prediction_df['series'].unique())
+        for series in num_series:
+            value = float(dummy_data[dummy_data.series == series]['value'])
+            prediction_df = self._add_sample_to_prediction_df(prediction_df, value, series, idx_diff)
 
-        dummy_date = pd.to_datetime(self._get_last_date(prediction_df)) + timedelta(days=1)
-        dummy_data['date'] = dummy_date
-        dummy_data['day_of_month'] = dummy_data.date.dt.day.astype(str).astype("category")
-        dummy_data['month'] = dummy_data.date.dt.month.astype(str).astype("category")
+        return prediction_df
 
-        prediction_df = pd.concat([prediction_df, dummy_data], axis=0)
+    def _add_current_state_to_prediction_df(self, prediction_df):
+        idx_diff = len(self.current_state.env_state[0].history)
+        if idx_diff > 0:
+            for series_state in self.current_state.env_state:
+                prediction_df = self._add_sample_to_prediction_df(prediction_df,
+                                                                  series_state.temperature,
+                                                                  series_state.series,
+                                                                  idx_diff)
         return prediction_df
 
     @staticmethod
     def _get_last_date(df):
         last_date = df[df.time_idx == df.time_idx.max()]['date'].unique()[0]
-        return last_date
+        return pd.to_datetime(last_date)
 
     @staticmethod
     def _get_last_time_idx(df):
         return df.time_idx.max()
 
-    # def _build_current_state_df(self):
-    #     simulated_test_df = pd.DataFrame()
-    #     current_date = self.init_test_df[self.init_test_df.time_idx == self.current_time_idx]['date'].unique()
-    #     for series, state in enumerate(self.current_state.env_state):
-    #         history = state.history
-    #         for time_idx_delta, value in enumerate(history, start=1):
-    #             data = {}
-    #             data['series'] = series
-    #             data['time_idx'] = self.current_time_idx + time_idx_delta
-    #             data['value'] = value
-    #             data['date'] = current_date + timedelta(days=1)
-    #             data['day_of_month'] = data['date'].dt.day
-    #             data['month'] = data['date'].dt.month
-    #             data_df = pd.DataFrame.from_dict(data)
-    #             data['day_of_month'] = data.date.dt.day.astype(str).astype("category")
-    #             data['month'] = data.date.dt.month.astype(str).astype("category")
-    #             simulated_test_df = pd.concat([simulated_test_df, data_df], axis=0)
-    #     current_state_df = pd.concat([self.init_test_df, simulated_test_df], axis=0)
-    #     return current_state_df
+    def _get_num_quantiles(self):
+        return self.tft_model.output_layer.out_features
 
-    # def _get_first_test_time_idx(self):
-    #     return self.val_ts_ds.decoded_index.time_idx_last.min() - 1
-    #
-    # def _get_initial_test_df(self, val_df):
-    #     return val_df.loc[val_df.time_idx.isin(list(range(self.current_time_idx - self.model_enc_len - self.model_pred_len, self.current_time_idx + 1)))]
+    def _is_missed_alert(self, lb, hb, prediction, steps_from_alert):
+        if (prediction < lb or prediction > hb) and (steps_from_alert == self.max_steps_from_alert):
+            return True
+        return False
+
+    def _is_false_alert(self, lb, hb, prediction, steps_from_alert):
+        if (lb <= prediction <= hb) and (steps_from_alert == 1):
+            return True
+        return False
+
+    def _is_good_alert(self, lb, hb, prediction, steps_from_alert):
+        if (prediction < lb or prediction > hb) and (steps_from_alert < self.max_steps_from_alert):
+            return True
+        return False
+
+    def _calc_good_alert_reward(self, steps_from_alert):
+        return self.reward_good_alert * (self.max_steps_from_alert - steps_from_alert)
+
+    def _predict_next_state(self):
+        prediction_df = self.build_prediction_df()
+        raw_prediction, x = self.tft_model.predict(prediction_df, mode="raw", return_x=True)
+        prediction = self.sample_from_prediction(raw_prediction)
+        return prediction
+
+    def _build_next_state(self, prediction, steps_from_alert):
+        if steps_from_alert == 0:
+            steps_from_alert = self.max_steps_from_alert
+
+        next_state = EnvState()
+        next_state.steps_from_alert = steps_from_alert
+        for series in range(len(prediction)):
+            series_current_state = self.current_state.env_state[series]
+            next_state_series_history = series_current_state.history + [series_current_state.temperature]
+            next_state_series_temperature = prediction[series].item()
+            next_state_series = State(series,
+                                      next_state_series_temperature,
+                                      next_state_series_history)
+            next_state.env_state.append(next_state_series)
+        return next_state

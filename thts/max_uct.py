@@ -1,5 +1,5 @@
-from gym_ad.algorithms.thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
-from gym_ad.node import DecisionNode, ChanceNode
+from thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
+from thts.node import DecisionNode, ChanceNode
 
 
 class MaxUCT(TrialBasedHeuristicTree):

@@ -24,7 +24,7 @@ def plot_volume_by_group(data, agency=None, sku=None):
 
 
 def plot_predictions(model, dataloader, df, config, dataset_name):
-    raw_predictions, x = model.predict(dataloader, mode="raw", return_x=True)
+    raw_predictions, x = model._predict_next_state(dataloader, mode="raw", return_x=True)
     index_df = dataloader.dataset.x_to_index(x)
     time_idx_min = index_df.time_idx.min()
     time_idx_max = index_df.time_idx.max()

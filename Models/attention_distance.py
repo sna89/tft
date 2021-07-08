@@ -43,7 +43,7 @@ def scale_data(data):
 
 
 def calc_attention_dist(config, model, dataloader, df):
-    raw_predictions, x = model.predict(dataloader, mode="raw", return_x=True)
+    raw_predictions, x = model._predict_next_state(dataloader, mode="raw", return_x=True)
     sensor_id_indices_mapping = dataloader.dataset.decoded_index.groupby('Sensor').indices
 
     prediction_horizon_attention_mapping = create_prediction_horizon_attention_mapping(model, raw_predictions)

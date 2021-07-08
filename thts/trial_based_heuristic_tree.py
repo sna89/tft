@@ -33,7 +33,9 @@ class TrialBasedHeuristicTree:
                 for trial in range(self.num_trials):
                     self._run_trial(node)
                 action = self.select_greedy_action(node)
+                print(action)
                 next_state, reward, terminal, _ = self.real_env.step(action)
+                print(reward)
                 tot_reward += reward
 
                 if terminal:

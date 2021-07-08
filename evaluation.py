@@ -5,7 +5,7 @@ from sklearn.metrics import mean_squared_error
 
 def evaluate(model, val_dl):
     actuals = torch.cat([y[0] for x, y in iter(val_dl)])
-    predictions = model.predict(val_dl)
+    predictions = model._predict_next_state(val_dl)
     mse = mean_squared_error(actuals, predictions)
     mae = calc_mae(actuals, predictions)
     print("MSE: {}, MAE: {}".format(mse, mae))
