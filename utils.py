@@ -29,10 +29,7 @@ def set_env_to_state(env, state):
     env.current_state = state
 
 
-def get_node_expandable_actions(env, node):
-    expanded_actions = [successor.action for successor in node.successors]
-    expandable_actions = [action for action in range(env.action_space.n) if action not in expanded_actions]
-    return expandable_actions
+
 
 
 # def get_last_sample_df_from_ts_ds(ts_ds: TimeSeriesDataSet, df: pd.DataFrame()):

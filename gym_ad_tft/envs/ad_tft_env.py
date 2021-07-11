@@ -5,13 +5,9 @@ from dataclasses import dataclass, field
 from typing import List
 import pandas as pd
 from datetime import datetime
-from datetime import timedelta
-from pytorch_forecasting import TimeSeriesDataSet
-from data_utils import get_dataloader
 import datetime
-from copy import deepcopy
-import matplotlib.pyplot as plt
 import random
+from env_thts_common import get_reward_and_terminal
 
 
 @dataclass
@@ -42,17 +38,13 @@ class AdTftEnv(gym.Env):
         self.last_date = self._get_last_date(self.val_df)
         self.last_time_idx = self._get_last_time_idx(self.val_df)
 
-        self.reward_false_alert = config["Env"]["Rewards"]["FalseAlert"]
-        self.reward_missed_alert = config["Env"]["Rewards"]["MissedAlert"]
-        self.reward_good_alert = config["Env"]["Rewards"]["GoodAlert"]
-
-        self.alert_prediction_steps = config["Env"]["AlertPredictionSteps"]
+        self.alert_prediction_steps = config["Env"]["AlertMaxPredictionSteps"]
+        self.min_steps_from_alert = config["Env"]["AlertMinPredictionSteps"]
         self.max_steps_from_alert = self.alert_prediction_steps + 1
-        self.min_steps_from_alert = 1
-        self.anomaly_bounds = config["AnomalyConfig"]
 
+        self.num_series = self._get_num_series()
         self.action_space = spaces.Discrete(2)
-        self.observation_space = spaces.Box(low=np.NINF, high=np.Inf, shape=(len(self.anomaly_bounds), 1))
+        self.observation_space = spaces.Box(low=np.NINF, high=np.Inf, shape=(self.num_series, 1))
 
         self.current_state = EnvState()
         self.reset()
@@ -68,7 +60,7 @@ class AdTftEnv(gym.Env):
         prediction = self._predict_next_state()
         if action == 1 or self.current_state.steps_from_alert < self.max_steps_from_alert:
             steps_from_alert -= 1
-        reward, terminal = self._get_reward_and_terminal(prediction, steps_from_alert)
+        reward, terminal = get_reward_and_terminal(self.config, prediction, steps_from_alert)
         next_state = self._build_next_state(prediction, steps_from_alert)
         prob = 1 / float(self._get_num_quantiles())
         return next_state, reward, terminal, prob
@@ -79,23 +71,6 @@ class AdTftEnv(gym.Env):
         quantile_idx = random.choice(list(range(num_quantiles)))
         prediction = list(map(lambda x: x[0][0][quantile_idx], quantile_prediction.unsqueeze(1)))
         return prediction
-
-    def _get_reward_and_terminal(self, prediction, steps_from_alert):
-        reward = 0
-        terminal = False
-        for num_series in range(len(prediction)):
-            bounds = self.config.get("AnomalyConfig").get("series_{}".format(num_series))
-            lb, hb = bounds.values()
-            series_prediction = prediction[num_series]
-            if self._is_missed_alert(lb, hb, series_prediction, steps_from_alert):
-                reward += self.reward_missed_alert
-                terminal = True
-            if self._is_false_alert(lb, hb, series_prediction, steps_from_alert):
-                reward += self.reward_false_alert
-            if self._is_good_alert(lb, hb, series_prediction, steps_from_alert):
-                reward += self._calc_good_alert_reward(steps_from_alert)
-                terminal = True
-        return reward, terminal
 
     def reset(self):
         self.current_state.env_state.clear()
@@ -120,7 +95,6 @@ class AdTftEnv(gym.Env):
         prediction_df = self._add_dummy_sample_to_prediction_df(prediction_df)
 
         prediction_df.reset_index(drop=True, inplace=True)
-        prediction_df.sort_values(by=['series', 'time_idx'], axis=0, inplace=True)
         return prediction_df
 
     def _add_sample_to_prediction_df(self, prediction_df, value, series, idx_diff):
@@ -140,8 +114,7 @@ class AdTftEnv(gym.Env):
         dummy_data = prediction_df[lambda x: x.time_idx == last_time_idx]
         idx_diff = len(self.current_state.env_state[0].history) + 1
 
-        num_series = list(prediction_df['series'].unique())
-        for series in num_series:
+        for series in range(self.num_series):
             value = float(dummy_data[dummy_data.series == series]['value'])
             prediction_df = self._add_sample_to_prediction_df(prediction_df, value, series, idx_diff)
 
@@ -169,23 +142,8 @@ class AdTftEnv(gym.Env):
     def _get_num_quantiles(self):
         return self.tft_model.output_layer.out_features
 
-    def _is_missed_alert(self, lb, hb, prediction, steps_from_alert):
-        if (prediction < lb or prediction > hb) and (steps_from_alert == self.max_steps_from_alert):
-            return True
-        return False
-
-    def _is_false_alert(self, lb, hb, prediction, steps_from_alert):
-        if (lb <= prediction <= hb) and (steps_from_alert == 1):
-            return True
-        return False
-
-    def _is_good_alert(self, lb, hb, prediction, steps_from_alert):
-        if (prediction < lb or prediction > hb) and (steps_from_alert < self.max_steps_from_alert):
-            return True
-        return False
-
-    def _calc_good_alert_reward(self, steps_from_alert):
-        return self.reward_good_alert * (self.max_steps_from_alert - steps_from_alert)
+    def _get_num_series(self):
+        return len(list(self.val_df['series'].unique()))
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()

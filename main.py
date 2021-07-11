@@ -42,6 +42,7 @@ if __name__ == '__main__':
     config = get_config(dataset_name)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl \
         = build_data(config, dataset_name)
+    plot_synthetic_data(config, pd.concat([train_df, val_df, test_df], axis=0))
     save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
     save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)

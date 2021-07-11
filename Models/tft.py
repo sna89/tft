@@ -93,6 +93,7 @@ def fit(trainer, model, train_dl, val_dl):
 
 def get_model_from_trainer(trainer):
     best_model_path = trainer.checkpoint_callback.best_model_path
+    os.environ["CHECKPOINT"] = best_model_path
     best_tft = get_model_from_checkpoint(best_model_path)
     return best_tft
 

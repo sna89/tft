@@ -1,8 +1,9 @@
 from thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
-from utils import get_argmax_from_list, set_env_to_state, get_node_expandable_actions
+from utils import get_argmax_from_list, set_env_to_state
 import pandas as pd
 from gym_ad_tft.envs.ad_tft_env import EnvState, State
+from env_thts_common import get_reward_and_terminal
 
 
 class TrialBasedHeuristicTree:
@@ -35,8 +36,12 @@ class TrialBasedHeuristicTree:
                     self._run_trial(node)
                 action = self.select_greedy_action(node)
                 num_executed_actions += 1
-                next_state, reward, terminal = self._get_next_state(node, test_df, num_executed_actions, action)
+                set_env_to_state(self.env, node.state)
+                next_state, reward, terminal = self._get_next_state_real_env(node, test_df, num_executed_actions, action)
                 print(action)
+                print([state.temperature for state in next_state.env_state])
+                print(reward)
+                print(terminal)
                 tot_reward += reward
 
                 if terminal:
@@ -117,20 +122,25 @@ class TrialBasedHeuristicTree:
         chance_node.add_successor(decision_node)
         return decision_node
 
-    def _get_next_state(self, node: DecisionNode, test_df, num_executed_actions, action):
-        val_df_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
-        new_sample = test_df[lambda x: x.time_idx == (val_df_max_time_idx + num_executed_actions)]
+    def _get_next_state_real_env(self, node: DecisionNode, test_df, num_executed_actions, action):
+        val_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
+        new_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + num_executed_actions)]
 
         new_state = EnvState()
         new_state.steps_from_alert = self._update_steps_from_alert(node.state.steps_from_alert, action)
         for _, series_new_sample in new_sample.iterrows():
             series_new_state = State(series_new_sample['series'], series_new_sample['value'], [])
             new_state.env_state.append(series_new_state)
-        return new_state
+
+        reward, terminal = get_reward_and_terminal(self.config, list(new_sample['value']), node.state.steps_from_alert)
+        if node.state.steps_from_alert == 0:
+            node.state.steps_from_alert = self.env.max_steps_from_alert
+        return new_state, reward, terminal
 
     def _update_steps_from_alert(self, steps_from_alert, action):
-        if action == 1:
+        if action == 1 or (action == 0 and steps_from_alert < self.env.max_steps_from_alert):
             steps_from_alert -= 1
             if steps_from_alert == 0:
                 steps_from_alert = self.env.max_steps_from_alert
         return steps_from_alert
+
