@@ -64,6 +64,11 @@ class DecisionNode(Node):
     def backup_dp_uct(self):
         self.backup_max_uct()
 
+    def __eq__(self, other):
+        if isinstance(other, DecisionNode):
+            return self.state == other.state
+        return False
+
 
 class ChanceNode(Node):
     def __init__(self, state, parent=None, action=None, uct_bias=0):

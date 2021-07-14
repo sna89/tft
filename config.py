@@ -55,15 +55,15 @@ def get_config(dataset_name):
         "AnomalyConfig":
             {
                 "series_0": {
-                    "lb": -1,
-                    "hb": 2.5,
+                    "lb": 1,
+                    "hb": 2.3,
                 },
                 "series_1": {
                     "lb": -0.5,
                     "hb": 0.5,
                 },
                 "series_2": {
-                    "lb": -1.1,
+                    "lb": -1.5,
                     "hb": 0.5,
                 },
                 # "series_3": {
@@ -96,8 +96,8 @@ def get_config(dataset_name):
                 # }
             },
         "Env": {
-            "AlertMaxPredictionSteps": 4,
-            "AlertMinPredictionSteps": 1,
+            "AlertMaxPredictionSteps": 6,
+            "AlertMinPredictionSteps": 0,
             "Rewards": {
                 "MissedAlert": -1000,
                 "FalseAlert": -100,
@@ -105,8 +105,8 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 50,
-            "TrialLength": 6,
+            "NumTrials": 100,
+            "TrialLength": 9,
             "UCTBias": np.sqrt(2),
             "Runs": 1
         }

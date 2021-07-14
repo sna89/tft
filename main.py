@@ -11,6 +11,8 @@ from data_factory import get_data_builder
 import gym
 from utils import save_to_pickle
 from thts.max_uct import MaxUCT
+from thts.dp_uct import DpUCT
+
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
@@ -47,7 +49,7 @@ if __name__ == '__main__':
     save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name)
-    # evaluate(fitted_model, test_dl)
+    # evaluate(fitted_model, val_dl)
     tft_env = gym.make("gym_ad_tft:tft-v0")
-    thts = MaxUCT(tft_env, config)
+    thts = DpUCT(tft_env, config)
     thts.run(test_df)
