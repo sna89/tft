@@ -42,10 +42,9 @@ class Node:
 
 
 class DecisionNode(Node):
-    def __init__(self, state, parent=None, terminal=False, prob=1):
+    def __init__(self, state, parent=None, terminal=False):
         super(DecisionNode, self).__init__(state, parent)
         self.terminal = terminal
-        self.prob = prob
 
     def select_chance_node(self):
         successor_nodes_uct_values = [chance_node.uct for chance_node in self.successors]

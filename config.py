@@ -96,8 +96,9 @@ def get_config(dataset_name):
                 # }
             },
         "Env": {
-            "AlertMaxPredictionSteps": 6,
+            "AlertMaxPredictionSteps": 4,
             "AlertMinPredictionSteps": 0,
+            "RestartSteps": 5,
             "Rewards": {
                 "MissedAlert": -1000,
                 "FalseAlert": -100,
@@ -105,7 +106,7 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 100,
+            "NumTrials": 200,
             "TrialLength": 9,
             "UCTBias": np.sqrt(2),
             "Runs": 1

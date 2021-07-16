@@ -11,7 +11,6 @@ from data_factory import get_data_builder
 import gym
 from utils import save_to_pickle
 from thts.max_uct import MaxUCT
-from thts.dp_uct import DpUCT
 
 
 warnings.filterwarnings("ignore")
@@ -51,5 +50,5 @@ if __name__ == '__main__':
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name)
     # evaluate(fitted_model, val_dl)
     tft_env = gym.make("gym_ad_tft:tft-v0")
-    thts = DpUCT(tft_env, config)
+    thts = MaxUCT(tft_env, config)
     thts.run(test_df)
