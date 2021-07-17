@@ -3,18 +3,18 @@ from pytorch_forecasting import Baseline
 from sklearn.metrics import mean_squared_error
 
 
-def evaluate(model, val_dl):
-    actuals = torch.cat([y[0] for x, y in iter(val_dl)])
-    predictions = model._predict_next_state(val_dl)
+def evaluate(model, dl):
+    actuals = torch.cat([y[0] for x, y in iter(dl)])
+    predictions = model.predict(dl)
     mse = mean_squared_error(actuals, predictions)
     mae = calc_mae(actuals, predictions)
     print("MSE: {}, MAE: {}".format(mse, mae))
     return mse, mae
 
 
-def evaluate_base_model(val_dl):
-    actuals = torch.cat([y for x, (y, weight) in iter(val_dl)])
-    baseline_predictions = Baseline().predict(val_dl)
+def evaluate_base_model(dl):
+    actuals = torch.cat([y for x, (y, weight) in iter(dl)])
+    baseline_predictions = Baseline().predict(dl)
     mse = mean_squared_error(actuals, baseline_predictions)
     mae = calc_mae(actuals, baseline_predictions)
     return mse, mae

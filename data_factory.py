@@ -5,7 +5,7 @@ from DataBuilders.electricity import ElectricityDataBuilder
 
 
 def get_data_builder(config, dataset_name):
-    if dataset_name == "2_fisherman":
+    if dataset_name == "Fisherman":
         return FishermanDataBuilder(config)
     elif dataset_name == "Synthetic":
         return SyntheticDataBuilder(config)

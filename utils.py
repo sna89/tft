@@ -1,7 +1,7 @@
 import pickle
 from typing import List
 import random
-from env_thts_common import EnvState
+
 
 def save_to_pickle(file, path):
     with open(path, "wb") as f:
@@ -23,5 +23,5 @@ def get_argmax_from_list(l: List, choose_random=True):
     return max_indices
 
 
-def set_env_to_state(env, state: EnvState):
+def set_env_to_state(env, state):
     env.current_state = state

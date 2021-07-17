@@ -3,14 +3,47 @@ import multiprocessing
 import numpy as np
 
 
-BASE_FOLDER = os.path.join('Data')
-STUDY_BASE_FOLDER = os.path.join('Study')
+DATETIME_COLUMN = "Date"
+
+DATA = "Data"
+STUDY = "Study"
+PLOT = "Plots"
+DATA_BASE_FOLDER = os.path.join(DATA)
+STUDY_BASE_FOLDER = os.path.join(STUDY)
+PLOT = os.path.join(PLOT)
+
+
+def init_base_folders():
+    if not os.path.isdir(DATA):
+        os.mkdir(DATA)
+    if not os.path.isdir(STUDY):
+        os.mkdir(STUDY)
+    if not os.path.isdir(PLOT):
+        os.mkdir(PLOT)
+    if not os.path.isdir('pkl'):
+        os.mkdir('pkl')
+
+
+def init_dataset_folders(dataset_name):
+    dataset_path = os.path.join(DATA, dataset_name)
+    study_path = os.path.join(STUDY, dataset_name)
+    plot_path = os.path.join(PLOT, dataset_name)
+
+    if not os.path.isdir(dataset_path):
+        os.mkdir(dataset_path)
+    if not os.path.isdir(study_path):
+        os.mkdir(study_path)
+    if not os.path.isdir(plot_path):
+        os.mkdir(plot_path)
 
 
 def get_config(dataset_name):
+    init_base_folders()
+    init_dataset_folders(dataset_name)
+
     dataset_config = {
         "Electricity": {
-            "Path": os.path.join(BASE_FOLDER, 'Electricity', 'LD2011_2014.txt'),
+            "Path": os.path.join(DATA_BASE_FOLDER, 'Electricity', 'LD2011_2014.txt'),
             "EncoderLength": 168,
             "PredictionLength": 24,
             "NumGroups": 11,
@@ -19,14 +52,17 @@ def get_config(dataset_name):
             "EndDate": "2013-01-01"
         },
         "Fisherman": {
-            "Path": os.path.join(BASE_FOLDER, 'Fisherman'),
-            "EncoderLength": 100,
-            "PredictionLength": 20
+            "Path": os.path.join(DATA_BASE_FOLDER, 'Fisherman'),
+            "TestDataFramePicklePath": os.path.join('pkl', 'fisherman_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join('pkl', 'fisherman_val_df.pkl'),
+            "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman'),
+            "EncoderLength": 56,
+            "PredictionLength": 7
         },
         "Synthetic": {
-            "Path": os.path.join(BASE_FOLDER, 'Synthetic'),
-            "TestDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'test_df.pkl'),
-            "ValDataFramePicklePath": os.path.join(BASE_FOLDER, 'Synthetic', 'val_df.pkl'),
+            "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
+            "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join('pkl', 'synthetic_val_df.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
             "EncoderLength": 30,
             "PredictionLength": 1,

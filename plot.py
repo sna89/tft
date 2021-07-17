@@ -136,11 +136,11 @@ def plot_baseline_predictions(test_dataloader):
 #     figs['decoder_variables'].figure.savefig('plots/' + 'decoder_variables_' + plot_name)
 
 
-# def plot_data(dataset_name, data):
-#     if dataset_name == 'synthetic':
-#         plot_synthetic_data(data)
-#     elif dataset_name == '2_fisherman':
-#         plot_fisherman_data(data)
+def plot_data(config, dataset_name, data):
+    if dataset_name == 'Synthetic':
+        plot_synthetic_data(config, data)
+    elif dataset_name == 'Fisherman':
+        plot_fisherman_data(data)
 
 
 def plot_synthetic_data(config, data):
@@ -153,7 +153,8 @@ def plot_synthetic_data(config, data):
     fig = px.line(data_to_plot, y="value", x="time_idx", color='series')
     fig.write_html(plot_name)
 
-# def plot_fisherman_data(data):
-#     # data_ = data[data.Type == 'internaltemp']
-#     fig = px.line(data, y="Value", x="time_idx", color='Sensor')
-#     fig.write_html('fisherman.html')
+
+def plot_fisherman_data(data):
+    # data_ = data[data.Type == 'internaltemp']
+    fig = px.line(data, y="Value", x="time_idx", color='Sensor')
+    fig.write_html('fisherman.html')

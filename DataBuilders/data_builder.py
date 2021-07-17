@@ -24,8 +24,8 @@ class DataBuilder(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def preprocess():
-        pass
+    def preprocess(data):
+        return data
 
     @staticmethod
     def add_time_idx_column(data):
