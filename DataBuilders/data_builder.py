@@ -3,11 +3,12 @@ from pytorch_forecasting import TimeSeriesDataSet
 
 
 class DataBuilder(ABC):
-    def __init__(self, train_ratio, val_ratio, enc_length, prediction_length):
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.enc_length = enc_length
-        self.prediction_length = prediction_length
+    def __init__(self, config):
+        self.config = config
+        self.train_ratio = config.get("Train").get("TrainRatio")
+        self.val_ratio = config.get("Train").get("ValRatio")
+        self.enc_length = config.get("EncoderLength")
+        self.prediction_length = config.get("PredictionLength")
 
     def build_ts_data(self):
         data = self.get_data()
@@ -23,8 +24,8 @@ class DataBuilder(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def preprocess():
-        pass
+    def preprocess(data):
+        return data
 
     @staticmethod
     def add_time_idx_column(data):

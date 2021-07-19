@@ -4,14 +4,14 @@ from DataBuilders.synthetic import SyntheticDataBuilder
 from DataBuilders.electricity import ElectricityDataBuilder
 
 
-def get_data_helper(dataset_name):
-    if dataset_name == "2_fisherman":
-        return FishermanDataBuilder()
-    elif dataset_name == "synthetic":
-        return SyntheticDataBuilder()
-    elif dataset_name == "stallion":
-        return StallionDataBuilder()
+def get_data_builder(config, dataset_name):
+    if dataset_name == "Fisherman":
+        return FishermanDataBuilder(config)
+    elif dataset_name == "Synthetic":
+        return SyntheticDataBuilder(config)
+    elif dataset_name == "Stallion":
+        return StallionDataBuilder(config)
     elif dataset_name == "Electricity":
-        return ElectricityDataBuilder()
+        return ElectricityDataBuilder(config)
     else:
         raise ValueError()
