@@ -2,6 +2,7 @@ from typing import List, Union
 from dataclasses import dataclass, field
 from torch import Tensor
 from thts.node import DecisionNode
+import os
 
 
 @dataclass
@@ -182,34 +183,35 @@ def build_next_state(env_name,
     assert env_name in ["simulation", "real"], "{} is not supported".format(env_name)
 
     next_state = EnvState()
-    num_series = len(next_state_values)
+    group_names = list(config.get("AnomalyConfig").get(os.getenv("DATASET")).keys())
     terminal_states = []
 
     if env_name == "simulation" and isinstance(action, int):
-        action = [action] * num_series
+        action = [action] * len(group_names)
 
-    for series in range(num_series):
-        lb, ub = get_series_lower_and_upper_bounds(config, series)
+    for idx, group_name in enumerate(group_names):
+        group_state = get_group_state(current_state.env_state, group_name)
 
-        steps_from_alert = update_steps_from_alert(current_state.env_state[series].steps_from_alert,
+        steps_from_alert = update_steps_from_alert(group_state.steps_from_alert,
                                                    max_steps_from_alert,
-                                                   action[series])
+                                                   action[idx])
 
-        out_of_bound = is_value_out_of_bound(next_state_values[series], lb, ub)
+        lb, ub = get_series_lower_and_upper_bounds(config, group_name)
+        out_of_bound = is_value_out_of_bound(next_state_values[idx], lb, ub)
         terminal_states.append(out_of_bound)
         restart_steps = update_restart_steps(out_of_bound,
-                                             current_state.env_state[series].restart_steps,
+                                             group_state.restart_steps,
                                              max_restart_steps)
 
-        next_state_series_history = current_state.env_state[series].history + \
-                                    [current_state.env_state[series].temperature]
+        next_state_series_history = group_state.history + \
+                                    [group_state.temperature]
 
-        if isinstance(next_state_values[series], Tensor):
-            next_state_series_temperature = next_state_values[series].item()
+        if isinstance(next_state_values[idx], Tensor):
+            next_state_series_temperature = next_state_values[idx].item()
         else:
-            next_state_series_temperature = next_state_values[series]
+            next_state_series_temperature = next_state_values[idx]
 
-        next_state_series = State(series,
+        next_state_series = State(group_name,
                                   steps_from_alert,
                                   restart_steps,
                                   next_state_series_temperature,
@@ -242,8 +244,8 @@ def is_alertable_state(current_node: DecisionNode, max_alert_prediction_steps: i
     return True
 
 
-def get_series_lower_and_upper_bounds(config, num_series):
-    bounds = config.get("AnomalyConfig").get("series_{}".format(num_series))
+def get_series_lower_and_upper_bounds(config, group):
+    bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group)
     lb, ub = bounds.values()
     return lb, ub
 
@@ -252,3 +254,9 @@ def is_value_out_of_bound(value, lb, ub):
     if value < lb or value > ub:
         return True
     return False
+
+
+def get_group_state(env_state, group):
+    for group_state in env_state:
+        if group == group_state.series:
+            return group_state

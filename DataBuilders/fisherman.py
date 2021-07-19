@@ -31,29 +31,28 @@ class FishermanDataBuilder(DataBuilder):
             if max_date_df < min_max_date:
                 min_max_date = max_date_df
 
-            df['Sensor'] = filename.replace('Sensor ', '').replace('.csv', '')
+            df[self.config.get("GroupKeyword")] = filename.replace('Sensor ', '').replace('.csv', '')
             dfs.append(df)
 
-        dfs = list(map(lambda dfx: FishermanDataBuilder._preprocess_single_df_fisherman(dfx,
-                                                                                        max_min_date + timedelta(minutes=10),
-                                                                                        min_max_date - timedelta(minutes=10)
-                                                                                        ),
+        dfs = list(map(lambda dfx: self._preprocess_single_df_fisherman(dfx,
+                                                                        max_min_date + timedelta(minutes=10),
+                                                                        min_max_date - timedelta(minutes=10)
+                                                                        ),
                        dfs)
                    )
         data = pd.concat(dfs, axis=0)
         data.reset_index(inplace=True, drop=True)
         return data
 
-    @staticmethod
-    def _preprocess_single_df_fisherman(data, min_date, max_date):
+    def _preprocess_single_df_fisherman(self, data, min_date, max_date):
         data = filter_df_by_date(data, min_date, max_date)
         data.drop_duplicates(inplace=True)
-        sensor = data['Sensor'].iloc[0]
+        sensor = data[self.config.get("GroupKeyword")].iloc[0]
         data_3h = data.set_index(DATETIME_COLUMN).resample('3H').mean()
         data_3h.fillna(method='bfill', inplace=True)
-        data_3h['Sensor'] = sensor
+        data_3h[self.config.get("GroupKeyword")] = sensor
         data_3h[DATETIME_COLUMN] = data_3h.index
-        data_3h = add_dt_columns(data_3h, ['hour', 'day_of_month', 'day_of_week'])
+        data_3h = add_dt_columns(data_3h, self.config.get("DatetimeAdditionalColumns"))
         data_3h.reset_index(inplace=True, drop=True)
         data_3h['time_idx'] = data_3h.apply(lambda x: FishermanDataBuilder.set_row_time_idx(x), axis=1)
         return data_3h
@@ -62,19 +61,19 @@ class FishermanDataBuilder(DataBuilder):
         fisherman_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
-            target="Value",
-            group_ids=["Sensor"],
+            target=self.config.get("ValueKeyword"),
+            group_ids=[self.config.get("GroupKeyword")],
             min_encoder_length=self.config.get("EncoderLength"),
             max_encoder_length=self.config.get("EncoderLength"),
             min_prediction_length=self.config.get("PredictionLength"),
             max_prediction_length=self.config.get("PredictionLength"),
-            static_categoricals=["Sensor"],
+            static_categoricals=[self.config.get("GroupKeyword")],
             static_reals=[],
-            time_varying_known_categoricals=['hour', 'day_of_month', 'day_of_week'],
+            time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx"],
             time_varying_unknown_categoricals=[],
             time_varying_unknown_reals=[
-                "Value"
+                self.config.get("ValueKeyword")
             ],
             # target_normalizer=GroupNormalizer(
             #     groups=["Sensor"]

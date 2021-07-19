@@ -6,7 +6,7 @@ def create_deepar_model(train_ts_ds):
     deepar = DeepAR.from_dataset(
         train_ts_ds,
         learning_rate=0.0005,
-        hidden_size=256,
+        hidden_size=1024,
         dropout=0.1,
         log_interval=10,
         log_val_interval=3,

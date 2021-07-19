@@ -5,16 +5,19 @@ import pandas as pd
 from datetime import datetime
 import datetime
 from env_thts_common import get_reward, build_next_state, EnvState, State
+import os
+from config import DATETIME_COLUMN
+from data_utils import add_dt_columns
 
 
-class AdTftEnv(gym.Env):
+class AdEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, config, tft_model, val_df, test_df):
+    def __init__(self, config, model, val_df, test_df):
         self.env_name = "simulation"
         self.config = config
 
-        self.tft_model = tft_model
+        self.model = model
         self.model_pred_len = self.config.get("PredictionLength")
         self.model_enc_len = self.config.get("EncoderLength")
 
@@ -57,21 +60,20 @@ class AdTftEnv(gym.Env):
         reward = get_reward(self.env_name, self.config, prediction, self.current_state, action)
         return next_state, reward
 
-    def _sample_from_prediction(self, raw_prediction):
-        quantile_predictions = raw_prediction["prediction"]
+    def _sample_from_prediction(self, model_prediction):
         quantile_idx_list = np.random.randint(low=0, high=self.num_quantiles, size=self.num_series)
         prediction = [quantile_prediction[0][0][quantile_idx_list[idx]] for idx, quantile_prediction in
-                      enumerate(quantile_predictions.unsqueeze(1))]
+                      enumerate(model_prediction.unsqueeze(1))]
         return prediction
 
     def reset(self):
         self.current_state.env_state.clear()
         last_sample_df = self.val_df[self.val_df.time_idx == self.val_df.time_idx.max()]
         for idx, sample in last_sample_df.iterrows():
-            state = State(sample['series'],
+            state = State(sample[self.config.get("GroupKeyword")],
                           self.max_steps_from_alert,
                           self.max_restart_steps,
-                          sample['value'],
+                          sample[self.config.get("ValueKeyword")],
                           [])
             self.current_state.env_state.append(state)
         return self.current_state
@@ -92,19 +94,18 @@ class AdTftEnv(gym.Env):
         new_data = self._add_dummy_sample_to_data(new_data)
 
         prediction_df = pd.concat([prediction_df, pd.DataFrame.from_dict(new_data)], axis=0)
-        prediction_df['day_of_month'] = prediction_df.date.dt.day.astype(str).astype("category")
-        prediction_df['month'] = prediction_df.date.dt.month.astype(str).astype("category")
+        for dt_column in self.config.get("DatetimeAdditionalColumns"):
+            prediction_df[dt_column] = prediction_df[dt_column].astype(str).astype("category")
         prediction_df.reset_index(drop=True, inplace=True)
         return prediction_df
 
     def _add_sample_to_data(self, new_data, value, series, idx_diff):
-        data = {'series': series,
-                'value': value,
-                'date': self.last_date + datetime.timedelta(days=idx_diff),
+        data = {self.config.get("GroupKeyword"): series,
+                self.config.get("ValueKeyword"): value,
+                DATETIME_COLUMN: self.last_date + datetime.timedelta(days=idx_diff),
                 'time_idx': self.last_time_idx + idx_diff
                 }
-        data['day_of_month'] = data['date'].day
-        data['month'] = data['date'].day
+        add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
         new_data.append(data)
         return new_data
 
@@ -116,8 +117,8 @@ class AdTftEnv(gym.Env):
         idx_diff = len(self.current_state.env_state[0].history) + 1
 
         for sample in dummy_data:
-            series = sample['series']
-            value = sample['value']
+            series = sample[self.config.get("GroupKeyword")]
+            value = sample[self.config.get("ValueKeyword")]
             new_data = self._add_sample_to_data(new_data, value, series, idx_diff)
 
         return new_data
@@ -134,7 +135,7 @@ class AdTftEnv(gym.Env):
 
     @staticmethod
     def _get_last_date(df):
-        last_date = df[df.time_idx == df.time_idx.max()]['date'].unique()[0]
+        last_date = df[df.time_idx == df.time_idx.max()][DATETIME_COLUMN].unique()[0]
         return pd.to_datetime(last_date)
 
     @staticmethod
@@ -142,13 +143,27 @@ class AdTftEnv(gym.Env):
         return df.time_idx.max()
 
     def _get_num_quantiles(self):
-        return self.tft_model.output_layer.out_features
+        return len(self.model.hparams.loss.quantiles)
 
     def _get_num_series(self):
-        return len(list(self.val_df['series'].unique()))
+        return len(list(self.val_df[self.config.get("GroupKeyword")].unique()))
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()
-        raw_prediction, x = self.tft_model.predict(prediction_df, mode="raw", return_x=True)
-        prediction = self._sample_from_prediction(raw_prediction)
+        mode = self._get_prediction_mode()
+        model_prediction, x = self.model.predict(prediction_df, mode=mode, return_x=True)
+        if hasattr(model_prediction, "prediction"):
+            model_prediction = model_prediction["prediction"]
+        prediction = self._sample_from_prediction(model_prediction)
         return prediction
+
+    @staticmethod
+    def _get_prediction_mode():
+        model_name = os.getenv("MODEL_NAME")
+        if model_name == "TFT":
+            mode = "raw"
+        elif model_name == "DeepAR":
+            mode = "quantiles"
+        else:
+            raise ValueError
+        return mode

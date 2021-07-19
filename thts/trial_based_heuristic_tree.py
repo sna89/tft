@@ -221,7 +221,7 @@ class TrialBasedHeuristicTree:
     def _transition_real_env(self, node: DecisionNode, test_df: pd.DataFrame(), iteration: int, action_list: List[int]):
         val_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
         new_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + iteration)]
-        new_sample_values = list(new_sample['value'])
+        new_sample_values = list(new_sample[self.config.get("ValueKeyword")])
 
         next_state, terminal_states = build_next_state(self.env_name,
                                                        self.config,
@@ -233,7 +233,7 @@ class TrialBasedHeuristicTree:
 
         reward = get_reward(self.env_name,
                             self.config,
-                            list(new_sample['value']),
+                            list(new_sample[self.config.get("ValueKeyword")]),
                             node.state,
                             action_list)
         return next_state, terminal_states, reward
@@ -259,7 +259,7 @@ class TrialBasedHeuristicTree:
         fig = go.Figure()
         for series in series_list:
 
-            series_y = list(test_df[(test_df.series == series) & (test_df.time_idx.isin(time_idx_list))]['value'].values)
+            series_y = list(test_df[(test_df.series == series) & (test_df.time_idx.isin(time_idx_list))][self.config.get("ValueKeyword")].values)
             fig.add_trace(
                 go.Scatter(x=time_idx_list, y=series_y, name="series: {}".format(series),
                            line=dict(color='royalblue', width=1))
@@ -268,7 +268,7 @@ class TrialBasedHeuristicTree:
             current_time_idx_list = list(time_idx_list[:len(action_history)])
             for idx, time_idx in enumerate(current_time_idx_list):
                 y_value = list(
-                    test_df[(test_df.series == series) & (test_df.time_idx == time_idx)]['value'].values)
+                    test_df[(test_df.series == series) & (test_df.time_idx == time_idx)][self.config.get("ValueKeyword")].values)
 
                 reward = reward_history[idx]
                 action_per_series_list = action_history[idx]

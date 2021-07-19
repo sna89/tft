@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import os
+from config import DATETIME_COLUMN
+
 
 BASE_FOLDER = os.path.join("tmp", "pycharm_project_99")
 
@@ -23,8 +25,16 @@ def plot_volume_by_group(data, agency=None, sku=None):
     del df
 
 
-def plot_predictions(model, dataloader, df, config, dataset_name):
-    raw_predictions, x = model._predict_next_state(dataloader, mode="raw", return_x=True)
+def plot_predictions(model, dataloader, df, config, dataset_name, model_name="TFT"):
+    if model_name == "TFT":
+        model_predictions, x = model.predict(dataloader, mode="raw", return_x=True)
+        predictions = model_predictions['prediction']
+        interpretation = model.interpret_output(model_predictions, attention_prediction_horizon=0)
+
+    elif model_name == "DeepAR":
+        predictions, x = model.predict(dataloader, mode="quantiles", return_x=True)
+
+    prediction_idx = predictions[0].shape[1] // 2
     index_df = dataloader.dataset.x_to_index(x)
     time_idx_min = index_df.time_idx.min()
     time_idx_max = index_df.time_idx.max()
@@ -33,14 +43,26 @@ def plot_predictions(model, dataloader, df, config, dataset_name):
                                                                config.get("PredictionLength")
                                                                )))].index)
 
-    interpretation = model.interpret_output(raw_predictions, attention_prediction_horizon=0)
-    prediction_idx = raw_predictions['prediction'][0].shape[1] // 2
+    if os.getenv("DATASET") == "Fisherman" and model_name == "TFT":
+        attention_dfs = []
+        for sensor in list(index_df["Sensor"].unique()):
+            sensor_indices = index_df[index_df.Sensor == sensor].index
+            sensor_attention = model_predictions["attention"][sensor_indices, 0, :, : model_predictions["encoder_lengths"].max()].mean(1).mean(0)
+            attention_df = pd.DataFrame.from_dict({"sensor": sensor, "data": sensor_attention})
+            attention_dfs.append(attention_df)
+        attention_df = pd.concat(attention_dfs, axis=0)
+        fig = px.line(attention_df, x=attention_df.index, y="data", color='sensor')
+        fig.write_html(os.path.join('Plots',
+                                     dataset_name,
+                                     "attention_sensors.html"))
+
     for idx in idx_list:
         time_idx, sensor = index_df.iloc[idx].values
         x_values_enc = pd.DatetimeIndex(
-            df[(df.time_idx <= time_idx) & (df.time_idx >= time_idx - config.get("EncoderLength"))]['date'].unique())
+            df[(df.time_idx <= time_idx) & (df.time_idx >= time_idx - config.get("EncoderLength"))][DATETIME_COLUMN].unique())
         x_values_pred = pd.DatetimeIndex(
-            df[(df.time_idx > time_idx) & (df.time_idx <= time_idx + config.get("PredictionLength"))]['date'].unique())
+            df[(df.time_idx > time_idx) & (df.time_idx <= time_idx + config.get("PredictionLength"))][DATETIME_COLUMN].unique())
+
         fig = make_subplots(specs=[[{"secondary_y": True}]])
 
         actual_enc = x['encoder_target'][idx]
@@ -55,26 +77,27 @@ def plot_predictions(model, dataloader, df, config, dataset_name):
             secondary_y=False,
         )
 
-        prediction = raw_predictions['prediction'][idx][:, prediction_idx]
+        prediction = predictions[idx][:, prediction_idx]
         fig.add_trace(
             go.Scatter(x=x_values_pred, y=prediction, name="Prediction", line=dict(color='firebrick', width=4)),
             secondary_y=False,
         )
 
-        attention = interpretation["attention"][idx]
-        fig.add_trace(
-            go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='lightgrey')),
-            secondary_y=True,
-        )
+        if model_name == "TFT":
+            attention = interpretation["attention"][idx]
+            fig.add_trace(
+                go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='lightgrey')),
+                secondary_y=True,
+            )
 
-        y_lower_quantile = raw_predictions['prediction'][idx][:, 0]
+        y_lower_quantile = predictions[idx][:, 0]
         fig.add_trace(
             go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile",
                        line=dict(color='grey', dash='dash')),
             secondary_y=False,
         )
 
-        y_upper_quantile = raw_predictions['prediction'][idx][:, -1]
+        y_upper_quantile = predictions[idx][:, -1]
         fig.add_trace(
             go.Scatter(x=x_values_pred, y=y_upper_quantile, name="Upper Quantile", line=dict(color='grey', dash='dash'),
                        fill='tonexty'),
@@ -82,22 +105,23 @@ def plot_predictions(model, dataloader, df, config, dataset_name):
         )
 
         fig.update_xaxes(title_text="<b>Time</b>")
-
         fig.update_yaxes(title_text="<b>Actual VS Prediction</b>", secondary_y=False)
-        fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
+        if model_name == "TFT":
+            fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
+        fig.update_layout(height=800, width=1400)
 
-        # fig.write_html('plots/prediction_sensor_' + sensor + '_' + str(time_idx) + '.html')
         fig.write_image(os.path.join('Plots',
                                      dataset_name,
                                      'prediction_sensor_' + str(sensor) + '_' + str(time_idx) + '.png'),
                         engine='kaleido')
 
-    interpretation = model.interpret_output(raw_predictions, reduction="sum", attention_prediction_horizon=0)
-    figs = model.plot_interpretation(interpretation)
-    figs['attention'].figure.savefig(os.path.join('Plots', dataset_name, 'attention.png'))
-    figs['static_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'static_variables.png'))
-    figs['encoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'encoder_variables.png'))
-    figs['decoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'decoder_variables.png'))
+    if model_name == "TFT":
+        interpretation = model.interpret_output(model_predictions, reduction="sum", attention_prediction_horizon=0)
+        figs = model.plot_interpretation(interpretation)
+        figs['attention'].figure.savefig(os.path.join('Plots', dataset_name, 'attention.png'))
+        figs['static_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'static_variables.png'))
+        figs['encoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'encoder_variables.png'))
+        figs['decoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'decoder_variables.png'))
 
 
 def plot_baseline_predictions(test_dataloader):

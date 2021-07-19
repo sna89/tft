@@ -2,7 +2,6 @@ import os
 import multiprocessing
 import numpy as np
 
-
 DATETIME_COLUMN = "Date"
 
 DATA = "Data"
@@ -57,7 +56,10 @@ def get_config(dataset_name):
             "ValDataFramePicklePath": os.path.join('pkl', 'fisherman_val_df.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman'),
             "EncoderLength": 56,
-            "PredictionLength": 7
+            "PredictionLength": 7,
+            "GroupKeyword": "Sensor",
+            "ValueKeyword": "Value",
+            "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week']
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
@@ -70,7 +72,10 @@ def get_config(dataset_name):
             "Seasonality": 30,
             "Trend": 2,
             "Noise": 0.05,
-            "Timesteps": 600
+            "Timesteps": 600,
+            "GroupKeyword": "series",
+            "ValueKeyword": "value",
+            "DatetimeAdditionalColumns": ['month', 'day_of_month']
         },
         "Stallion": {
             "EncoderLength": 14,
@@ -90,46 +95,59 @@ def get_config(dataset_name):
     anomaly_config = {
         "AnomalyConfig":
             {
-                "series_0": {
-                    "lb": 1,
-                    "hb": 2.3,
+                "Synthetic": {
+                    "series_0": {
+                        "lb": 1,
+                        "hb": 2.3,
+                    },
+                    "series_1": {
+                        "lb": -0.5,
+                        "hb": 0.5,
+                    },
+                    "series_2": {
+                        "lb": -1.5,
+                        "hb": 0.5,
+                    }
                 },
-                "series_1": {
-                    "lb": -0.5,
-                    "hb": 0.5,
-                },
-                "series_2": {
-                    "lb": -1.5,
-                    "hb": 0.5,
-                },
-                # "series_3": {
-                #     "lb": -1,
-                #     "hb": 5,
-                # },
-                # "series_4": {
-                #     "lb": -1,
-                #     "hb": 2,
-                # },
-                # "series_5": {
-                #     "lb": -1,
-                #     "hb": 1,
-                # },
-                # "series_6": {
-                #     "lb": -0.5,
-                #     "hb": 0.5,
-                # },
-                # "series_7": {
-                #     "lb": -0.1,
-                #     "hb": 0.1,
-                # },
-                # "series_8": {
-                #     "lb": -0.5,
-                #     "hb": 0.5,
-                # },
-                # "series_9": {
-                #     "lb": -0.3,
-                #     "hb": 1,
-                # }
+                "Fisherman": {
+                    "U100330": {
+                        "lb": -14.5,
+                        "hb": -10,
+                    },
+                    "U100314": {
+                        "lb": -20,
+                        "hb": 22,
+                    },
+                    "U100329": {
+                        "lb": 3.2,
+                        "hb": 6,
+                    },
+                    "U100337": {
+                        "lb": 0,
+                        "hb": 4,
+                    },
+                    "U106724": {
+                        "lb": -1,
+                        "hb": 6,
+                    },
+                    "U100312": {
+                        "lb": 0,
+                        "hb": 4,
+                    },
+                    "U100309": {
+                        "lb": 0,
+                        "hb": 6,
+                    },
+                    "U100310": {
+                        "lb": 8,
+                        "hb": 15,
+                    },
+                    "U106755": {
+                        "lb": 15,
+                        "hb": 30,
+                    },
+                }
+
             },
         "Env": {
             "AlertMaxPredictionSteps": 4,

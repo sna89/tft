@@ -3,6 +3,7 @@ from pytorch_forecasting.data.examples import generate_ar_data
 from pytorch_forecasting import TimeSeriesDataSet
 from data_utils import add_dt_columns
 from DataBuilders.data_builder import DataBuilder
+from config import DATETIME_COLUMN
 
 
 class SyntheticDataBuilder(DataBuilder):
@@ -15,27 +16,26 @@ class SyntheticDataBuilder(DataBuilder):
                                 n_series=self.config.get("Series"),
                                 trend=self.config.get("Trend"),
                                 noise=self.config.get("Noise"))
-        data["date"] = pd.Timestamp("2020-01-01") + pd.to_timedelta(data.time_idx, "D")
+        data[DATETIME_COLUMN] = pd.Timestamp("2020-01-01") + pd.to_timedelta(data.time_idx, "D")
         return data
 
-    @staticmethod
-    def preprocess(data):
-        data = add_dt_columns(data, ['month', 'day_of_month'])
+    def preprocess(self, data):
+        data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
         return data
 
     def define_ts_ds(self, train_df):
         synthetic_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
-            target="value",
-            group_ids=["series"],
+            target=self.config.get("ValueKeyword"),
+            group_ids=[self.config.get("GroupKeyword")],
             min_encoder_length=self.enc_length,
             max_encoder_length=self.enc_length,
             min_prediction_length=self.prediction_length,
             max_prediction_length=self.prediction_length,
-            time_varying_unknown_reals=["value"],
+            time_varying_unknown_reals=[self.config.get("ValueKeyword")],
             time_varying_known_reals=["time_idx"],
-            time_varying_known_categoricals=["month", "day_of_month"],
+            time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             # target_normalizer=GroupNormalizer(groups=["series"]),
             add_relative_time_idx=True,
             add_target_scales=True,
