@@ -54,6 +54,7 @@ def get_config(dataset_name):
             "Path": os.path.join(DATA_BASE_FOLDER, 'Fisherman'),
             "TestDataFramePicklePath": os.path.join('pkl', 'fisherman_test_df.pkl'),
             "ValDataFramePicklePath": os.path.join('pkl', 'fisherman_val_df.pkl'),
+            "GroupMappingPicklePath": os.path.join('pkl', 'fisherman_group_mapping.pkl'),
             "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman'),
             "EncoderLength": 56,
             "PredictionLength": 7,
@@ -85,7 +86,7 @@ def get_config(dataset_name):
 
     train_config = {
         "Train": {
-            "BatchSize": 128,
+            "BatchSize": 32,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0
@@ -96,22 +97,22 @@ def get_config(dataset_name):
         "AnomalyConfig":
             {
                 "Synthetic": {
-                    "series_0": {
+                    "0": {
                         "lb": 1,
                         "hb": 2.3,
                     },
-                    "series_1": {
+                    "1": {
                         "lb": -0.5,
                         "hb": 0.5,
                     },
-                    "series_2": {
+                    "2": {
                         "lb": -1.5,
                         "hb": 0.5,
                     }
                 },
                 "Fisherman": {
                     "U100330": {
-                        "lb": -14.5,
+                        "lb": -14.9,
                         "hb": -10,
                     },
                     "U100314": {
@@ -150,9 +151,9 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "AlertMaxPredictionSteps": 4,
+            "AlertMaxPredictionSteps": 3,
             "AlertMinPredictionSteps": 0,
-            "RestartSteps": 5,
+            "RestartSteps": 3,
             "Rewards": {
                 "MissedAlert": -1000,
                 "FalseAlert": -100,
@@ -160,8 +161,8 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 200,
-            "TrialLength": 9,
+            "NumTrials": 1,
+            "TrialLength": 1,
             "UCTBias": np.sqrt(2),
             "Runs": 1
         }

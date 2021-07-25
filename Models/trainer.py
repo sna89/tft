@@ -6,18 +6,18 @@ from pytorch_forecasting.models.temporal_fusion_transformer import TemporalFusio
 from pytorch_forecasting.models.deepar import DeepAR
 
 
-def create_trainer():
+def create_trainer(gradient_clip_val=0.1):
     early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=1e-4, patience=5, verbose=True, mode="min")
     logger = TensorBoardLogger("tb_logs", name="my_model")
     lr_logger = LearningRateMonitor(logging_interval='step')  # log the learning rate
 
     trainer = pl.Trainer(
-        gpus=2,
+        gpus=1,
         max_epochs=200,
-        # gradient_clip_val=0.1,
+        gradient_clip_val=gradient_clip_val,
         callbacks=[lr_logger, early_stop_callback],
         logger=logger,
-        accelerator="ddp"
+        # accelerator="ddp"
     )
     return trainer
 
@@ -45,3 +45,14 @@ def get_model_from_checkpoint(checkpoint, model_name):
     elif model_name == "DeepAR":
         best_model = DeepAR.load_from_checkpoint(checkpoint)
     return best_model
+
+
+def get_prediction_mode():
+    model_name = os.getenv("MODEL_NAME")
+    if model_name == "TFT":
+        mode = "raw"
+    elif model_name == "DeepAR":
+        mode = "quantiles"
+    else:
+        raise ValueError
+    return mode

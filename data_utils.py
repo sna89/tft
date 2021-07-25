@@ -48,6 +48,7 @@ def add_dt_columns(data: Union[pd.DataFrame, Dict], dt_attributes: List = []):
 
     return data
 
+
 def add_log_column(data, col_name):
     new_col_name = 'log_' + col_name
     data[new_col_name] = np.log(data[col_name])
@@ -57,4 +58,14 @@ def get_dataloader(ts_ds, is_train, config):
     dataloader = ts_ds.to_dataloader(train=is_train, batch_size=config["Train"].get("BatchSize"),
                                      num_workers=config["Train"].get("CPU"))
     return dataloader
+
+
+def get_group_indices_mapping(config, dl):
+    mapping = dl.dataset.decoded_index.groupby(config.get("GroupKeyword")).indices
+    return mapping
+
+
+def reverse_key_value_mapping(d):
+    return {v: k for k, v in d.items()}
+
 

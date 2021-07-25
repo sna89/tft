@@ -161,24 +161,24 @@ def plot_baseline_predictions(test_dataloader):
 
 
 def plot_data(config, dataset_name, data):
+    data_to_plot = data.drop_duplicates(subset=["time_idx", config.get("GroupKeyword")])
     if dataset_name == 'Synthetic':
-        plot_synthetic_data(config, data)
+        plot_synthetic_data(config, data_to_plot)
     elif dataset_name == 'Fisherman':
-        plot_fisherman_data(data)
+        plot_fisherman_data(data_to_plot)
 
 
-def plot_synthetic_data(config, data):
+def plot_synthetic_data(config, data_to_plot):
     plot_name = '{Series}_series_{Seasonality}_seasonality_{Trend}_trend.html'.format(
         Series=config.get("Series"),
         Seasonality=config.get("Seasonality"),
         Trend=config.get("Trend")
     )
-    data_to_plot = data.drop_duplicates(subset=["time_idx", "series"])
     fig = px.line(data_to_plot, y="value", x="time_idx", color='series')
     fig.write_html(plot_name)
 
 
-def plot_fisherman_data(data):
+def plot_fisherman_data(data_to_plot):
     # data_ = data[data.Type == 'internaltemp']
-    fig = px.line(data, y="Value", x="time_idx", color='Sensor')
+    fig = px.line(data_to_plot, y="Value", x="time_idx", color='Sensor')
     fig.write_html('fisherman.html')

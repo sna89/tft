@@ -8,14 +8,15 @@ import os
 
 def optimize_tft_hp(config, train_dl, val_dl):
     study_full_path = os.path.join(config.get("StudyPath"), "study.pkl")
+    is_study = os.getenv("STUDY") == "True"
 
-    if not os.path.isfile(study_full_path):
+    if is_study:
         study = optimize_hyperparameters(
             train_dl,
             val_dl,
             model_path=config.get("StudyPath"),
-            n_trials=25,
-            max_epochs=10,
+            n_trials=100,
+            max_epochs=20,
             gradient_clip_val_range=(0.01, 1.0),
             hidden_size_range=(8, 128),
             hidden_continuous_size_range=(8, 128),
@@ -28,7 +29,10 @@ def optimize_tft_hp(config, train_dl, val_dl):
         )
         save_to_pickle(study, study_full_path)
     else:
-        study = load_pickle(study_full_path)
+        if os.path.isfile(study_full_path):
+            study = load_pickle(study_full_path)
+        else:
+            raise ValueError
 
     return study
 

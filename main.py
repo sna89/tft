@@ -3,10 +3,10 @@ from plot import plot_data, plot_predictions
 from config import get_config
 from Models.tft import create_tft_model, optimize_tft_hp
 from Models.trainer import create_trainer, fit, get_model_from_trainer, get_model_from_checkpoint
-from Models.deep_ar import create_deepar_model
+from Models.deep_ar import create_deepar_model, optimize_deepar_hp
 from evaluation import evaluate, evaluate_base_model
 import warnings
-from data_utils import get_dataloader
+from data_utils import get_dataloader, get_group_indices_mapping
 import os
 from data_factory import get_data_builder
 import gym
@@ -29,15 +29,18 @@ def build_data(config, dataset_name):
 
 def optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit=True):
     assert model_name in ["DeepAR", "TFT"], model_name
-    trainer = create_trainer()
 
+    study = None
     model = None
     if model_name == "TFT":
         study = optimize_tft_hp(config, train_dl, val_dl)
         model = create_tft_model(train_ts_ds, study)
     elif model_name == "DeepAR":
-        model = create_deepar_model(train_ts_ds)
+        study = optimize_deepar_hp(config, train_dl, val_dl)
+        model = create_deepar_model(train_ts_ds, None)
 
+    gradient_clip_val = study.best_params['gradient_clip_val']
+    trainer = create_trainer(gradient_clip_val)
     if to_fit:
         trainer = fit(trainer, model, train_dl, val_dl)
         model = get_model_from_trainer(trainer, model_name)
@@ -58,8 +61,8 @@ if __name__ == '__main__':
     save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
     save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit)
-    # evaluate(fitted_model, test_dl)
-    # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name, model_name)
+    evaluate(fitted_model, test_dl)
+    plot_predictions(fitted_model, test_dl, test_df, config, dataset_name, model_name)
     ad_env = gym.make("gym_ad:ad-v0")
     thts = MaxUCT(ad_env, config)
     thts.run(test_df)

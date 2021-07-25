@@ -21,6 +21,7 @@ class SyntheticDataBuilder(DataBuilder):
 
     def preprocess(self, data):
         data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
+        data[self.config.get("GroupKeyword")] = data[self.config.get("GroupKeyword")].astype(str).astype("category")
         return data
 
     def define_ts_ds(self, train_df):

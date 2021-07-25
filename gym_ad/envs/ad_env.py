@@ -4,10 +4,12 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import datetime
-from env_thts_common import get_reward, build_next_state, EnvState, State
+from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names
 import os
 from config import DATETIME_COLUMN
 from data_utils import add_dt_columns
+from data_utils import reverse_key_value_mapping
+from Models.trainer import get_prediction_mode
 
 
 class AdEnv(gym.Env):
@@ -23,6 +25,7 @@ class AdEnv(gym.Env):
 
         self.val_df = val_df
         self.test_df = test_df
+        self.group_idx_mapping = self._get_group_idx_mapping()
         self.last_date = self._get_last_date(self.val_df)
         self.last_time_idx = self._get_last_time_idx(self.val_df)
 
@@ -49,15 +52,25 @@ class AdEnv(gym.Env):
 
         prediction = self._predict_next_state()
 
-        next_state, _ = build_next_state(self.env_name,
-                                         self.config,
-                                         self.current_state,
-                                         prediction,
-                                         self.max_steps_from_alert,
-                                         self.max_restart_steps,
-                                         action)
+        group_names = get_group_names(self.group_idx_mapping)
+        action = {group_name: action for group_name in group_names}
 
-        reward = get_reward(self.env_name, self.config, prediction, self.current_state, action)
+        next_state, terminal_states, _ = build_next_state(self.env_name,
+                                                          self.config,
+                                                          self.current_state,
+                                                          group_names,
+                                                          prediction,
+                                                          self.max_steps_from_alert,
+                                                          self.max_restart_steps,
+                                                          action)
+
+        reward = get_reward(self.env_name,
+                            self.config,
+                            group_names,
+                            terminal_states,
+                            self.current_state,
+                            action)
+
         return next_state, reward
 
     def _sample_from_prediction(self, model_prediction):
@@ -150,20 +163,23 @@ class AdEnv(gym.Env):
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()
-        mode = self._get_prediction_mode()
+        mode = get_prediction_mode()
         model_prediction, x = self.model.predict(prediction_df, mode=mode, return_x=True)
-        if hasattr(model_prediction, "prediction"):
+        if isinstance(model_prediction, dict) and "prediction" in model_prediction:
             model_prediction = model_prediction["prediction"]
         prediction = self._sample_from_prediction(model_prediction)
+        idx_group_mapping = reverse_key_value_mapping(self.group_idx_mapping)
+        if os.getenv("DATASET") == "Fisherman":
+            prediction = {idx_group_mapping[idx.item()]: value for idx, value in zip(x["groups"], prediction)}
+        elif os.getenv("DATASET") == "Synthetic":
+            prediction = {idx_group_mapping[str(idx)]: value for idx, value in
+                          zip(range(self.config.get("Series")), prediction)}
         return prediction
 
-    @staticmethod
-    def _get_prediction_mode():
-        model_name = os.getenv("MODEL_NAME")
-        if model_name == "TFT":
-            mode = "raw"
-        elif model_name == "DeepAR":
-            mode = "quantiles"
+    def _get_group_idx_mapping(self):
+        if isinstance(self.model.hparams.embedding_labels, dict) and \
+                self.config.get("GroupKeyword") in self.model.hparams.embedding_labels:
+            return self.model.hparams.embedding_labels[self.config.get("GroupKeyword")]
         else:
-            raise ValueError
-        return mode
+            group_name_list = list(self.test_df[self.config.get("GroupKeyword")].unique())
+            return {group_name: group_name for group_name in group_name_list}

@@ -1,18 +1,22 @@
 from thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 from utils import get_argmax_from_list, set_env_to_state
-from env_thts_common import get_reward, build_next_state, EnvState, State, is_alertable_state, \
-    get_series_lower_and_upper_bounds
+from env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
+    get_group_lower_and_upper_bounds, get_group_state, get_group_names
 import time
 import plotly.graph_objects as go
 import pandas as pd
-from typing import List
+from typing import Dict, List
+import torch
 
 
 class TrialBasedHeuristicTree:
     def __init__(self, env, config):
         self.env_name = "real"
         self.env = env
+        self.model = self.env.model
+        self.group_idx_mapping = self.env.group_idx_mapping
+        self.group_names = get_group_names(self.group_idx_mapping)
         self.num_actions = self.env.action_space.n
         self.config = config
 
@@ -37,34 +41,51 @@ class TrialBasedHeuristicTree:
 
             action_history = []
             reward_history = []
-            terminal_history = []
+            terminal_history = [{group_name: False for group_name in self.group_names}]
+            restart_history = [{group_name: False for group_name in self.group_names}]
             alert_prediction_steps_history = []
+            restart_steps_history = []
 
             num_iterations = self._get_num_iterations(test_df)
             for iteration in range(1, num_iterations):
+                start = time.time()
                 action, run_time = self._before_transition(current_node)
-                action_list = self._postprocess_action(current_node, action, test_df, iteration)
+                action_dict = self._postprocess_action(action,
+                                                       current_node,
+                                                       terminal_history,
+                                                       restart_history,
+                                                       test_df,
+                                                       iteration)
 
-                next_state, env_terminal_list, reward = self._transition_real_env(current_node,
-                                                                                  test_df,
-                                                                                  iteration,
-                                                                                  action_list)
+                next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
+                                                                                                  test_df,
+                                                                                                  iteration,
+                                                                                                  action_dict)
 
                 next_state = self._after_transition(next_state, env_terminal_list)
 
-                action_history.append(action_list)
+                action_history.append(action_dict)
                 reward_history.append(reward)
                 terminal_history.append(env_terminal_list)
-                alert_prediction_steps_history.append([series_state.steps_from_alert
-                                                       for series_state
-                                                       in current_node.state.env_state])
+                restart_history.append(restart_states)
+                alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
+                                                       for group_state
+                                                       in current_node.state.env_state})
+                restart_steps_history.append({group_state.series: group_state.restart_steps
+                                                       for group_state
+                                                       in current_node.state.env_state})
+
+                end = time.time()
+                run_time = end - start
 
                 self.render(test_df,
                             run_time,
                             action_history,
                             reward_history,
                             terminal_history,
-                            alert_prediction_steps_history)
+                            restart_history,
+                            alert_prediction_steps_history,
+                            restart_steps_history)
 
                 current_node = DecisionNode(next_state, parent=current_node, terminal=False)
 
@@ -74,58 +95,71 @@ class TrialBasedHeuristicTree:
         if not is_alertable_state(current_node, self.alert_prediction_steps, self.restart_env_iterations):
             pass
         else:
-            start = time.time()
             for trial in range(self.num_trials):
                 self._run_trial(current_node)
             action = self.select_greedy_action(current_node)
-            end = time.time()
-            run_time = end - start
         return action, run_time
 
-    def _postprocess_action(self, current_node: DecisionNode, action: int, test_df: pd.DataFrame(), iteration: int) -> List[int]:
+    def _postprocess_action(self,
+                            action: int,
+                            current_node: DecisionNode,
+                            terminal_history: List[Dict],
+                            restart_history: List[Dict],
+                            test_df: pd.DataFrame(),
+                            iteration: int
+                            ) -> Dict:
         if action == 0:
-            return [action] * self.env.num_series
+            return {group_name: action for group_name in self.group_names}
         else:
-            action_list = []
-            for series in range(self.env.num_series):
-                restart_steps = current_node.state.env_state[series].restart_steps
-                if restart_steps == self.env.max_restart_steps:
-                    time_idx_range = self.get_volatility_time_idx_range(test_df, iteration)
-                    if self.series_volatility_exceeds_bound(test_df, time_idx_range, series):
-                        action_list.append(1)
+            action_dict = {}
+            time_idx_range = self.get_encoder_time_idx_range(test_df, iteration)
+            prediction_df = test_df[test_df.time_idx.isin(time_idx_range)]
+            prediction, x = self.model.predict(prediction_df, mode="prediction", return_x=True)
+            for group_name in self.group_names:
+                is_restart = terminal_history[-1][group_name]
+                is_terminal = restart_history[-1][group_name]
+                group_state = get_group_state(current_node.state.env_state, group_name)
+                if not is_restart \
+                        and not is_terminal \
+                        and group_state.steps_from_alert == self.env.max_steps_from_alert:
+                    group_prediction = prediction[self.group_idx_mapping[group_name]]
+                    if self.group_prediction_exceed_bounds(group_prediction, group_name):
+                        action_dict[group_name] = 1
                     else:
-                        action_list.append(0)
+                        action_dict[group_name] = 0
                 else:
-                    action_list.append(0)
-            return action_list
+                    action_dict[group_name] = 0
+            return action_dict
 
-    def get_volatility_time_idx_range(self, test_df: pd.DataFrame(), iteration: int):
+    def get_encoder_time_idx_range(self, test_df: pd.DataFrame(), iteration: int):
         min_time_idx = test_df.time_idx.min()
-        time_idx_range_start = min_time_idx + iteration
-        time_idx_range_end = time_idx_range_start + self.env.model_enc_len
+        time_idx_range_start = min_time_idx + iteration - 1
+        time_idx_range_end = time_idx_range_start + self.env.model_enc_len + self.env.model_pred_len
         time_idx_range = list(range(time_idx_range_start, time_idx_range_end))
         return time_idx_range
 
-    def series_volatility_exceeds_bound(self, test_df: pd.DataFrame, time_idx_range: List[int], series: int):
-        series_df = test_df[(test_df.series == series) & (test_df.time_idx.isin(time_idx_range))]
-        std = series_df.value.std()
-        mean = series_df.value.mean()
-        lb, ub = get_series_lower_and_upper_bounds(self.config, series)
-        if (mean + 1.65 * std > ub) or (mean - 1.65 * std < lb):
+    def group_prediction_exceed_bounds(self, group_prediction, group_name: str):
+        lb, ub = get_group_lower_and_upper_bounds(self.config, group_name)
+        out_of_bound = torch.sum((torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)))
+        if out_of_bound > 0:
             return True
         else:
             return False
 
-    def _after_transition(self, next_state: EnvState, env_terminal_list: List[bool]):
-        for series, series_state in enumerate(next_state.env_state):
-            env_terminal = env_terminal_list[series]
-            restart_steps = series_state.restart_steps
-            if self.is_terminal(env_terminal, restart_steps):
-                next_state.env_state[series].steps_from_alert = self.env.max_steps_from_alert
+    @staticmethod
+    def alert_condition(value, lower_bound, upper_bound):
+        return
+
+    def _after_transition(self, next_state: EnvState, env_terminal_list: dict):
+        for idx, group_state in enumerate(next_state.env_state):
+            env_terminal = env_terminal_list[group_state.series]
+            restart_steps = group_state.restart_steps
+            if self.is_restart_steps(env_terminal, restart_steps):
+                next_state.env_state[idx].steps_from_alert = self.env.max_steps_from_alert
 
         return next_state
 
-    def is_terminal(self, env_terminal, restart_env_iterations):
+    def is_restart_steps(self, env_terminal, restart_env_iterations):
         if env_terminal or restart_env_iterations < self.restart_env_iterations:
             return True
         return False
@@ -218,89 +252,133 @@ class TrialBasedHeuristicTree:
                 return True
         return False
 
-    def _transition_real_env(self, node: DecisionNode, test_df: pd.DataFrame(), iteration: int, action_list: List[int]):
+    def _transition_real_env(self, node: DecisionNode, test_df: pd.DataFrame(), iteration: int, action_dict: Dict):
         val_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
-        new_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + iteration)]
-        new_sample_values = list(new_sample[self.config.get("ValueKeyword")])
+        next_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + iteration)]
+        next_sample.set_index(self.config.get("GroupKeyword"), inplace=True)
+        next_state_values = next_sample[[self.config.get("ValueKeyword")]].to_dict(orient="dict")[
+            self.config.get("ValueKeyword")]
 
-        next_state, terminal_states = build_next_state(self.env_name,
-                                                       self.config,
-                                                       node.state,
-                                                       new_sample_values,
-                                                       self.env.max_steps_from_alert,
-                                                       self.env.max_restart_steps,
-                                                       action_list)
+        current_state = node.state
+        next_state, next_state_terminal, next_state_restart = build_next_state(self.env_name,
+                                                                               self.config,
+                                                                               current_state,
+                                                                               self.group_names,
+                                                                               next_state_values,
+                                                                               self.env.max_steps_from_alert,
+                                                                               self.env.max_restart_steps,
+                                                                               action_dict)
 
         reward = get_reward(self.env_name,
                             self.config,
-                            list(new_sample[self.config.get("ValueKeyword")]),
-                            node.state,
-                            action_list)
-        return next_state, terminal_states, reward
+                            self.group_names,
+                            next_state_terminal,
+                            current_state,
+                            action_dict)
+
+        return next_state, next_state_terminal, next_state_restart, reward
 
     def render(self,
                test_df: pd.DataFrame(),
                run_time: float,
-               action_history: List[List[int]],
+               action_history: List[Dict],
                reward_history: List[float],
-               terminal_history: List[List[bool]],
-               alert_prediction_steps_history: List[List[int]]):
+               terminal_history: List[Dict],
+               restart_history: List[Dict],
+               alert_prediction_steps_history: List[Dict],
+               restart_steps_history: List[Dict]):
 
         print("Action: {}".format(action_history[-1]))
         print("Reward: {}".format(reward_history[-1]))
         print("Iteration RunTime: {}".format(run_time))
 
-        series_list = list(test_df.series.unique())
+        min_test_time_idx = self._get_min_test_time_idx(test_df)
+        time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
 
-        min_time_idx = test_df.time_idx.min() + \
-                       self.config.get("EncoderLength") - 1
-        time_idx_list = list(test_df[test_df.time_idx >= min_time_idx]['time_idx'].unique())
-
-        fig = go.Figure()
-        for series in series_list:
-
-            series_y = list(test_df[(test_df.series == series) & (test_df.time_idx.isin(time_idx_list))][self.config.get("ValueKeyword")].values)
-            fig.add_trace(
-                go.Scatter(x=time_idx_list, y=series_y, name="series: {}".format(series),
-                           line=dict(color='royalblue', width=1))
-            )
+        for group_name in self.group_names:
+            fig = go.Figure()
+            fig = self._add_group_y_value_plot(fig, test_df, group_name, time_idx_list)
 
             current_time_idx_list = list(time_idx_list[:len(action_history)])
             for idx, time_idx in enumerate(current_time_idx_list):
-                y_value = list(
-                    test_df[(test_df.series == series) & (test_df.time_idx == time_idx)][self.config.get("ValueKeyword")].values)
-
                 reward = reward_history[idx]
-                action_per_series_list = action_history[idx]
-                terminal_per_series_list = terminal_history[idx]
-                steps_from_alert_per_series_list = alert_prediction_steps_history[idx]
+                action = action_history[idx][group_name]
+                terminal = terminal_history[idx][group_name]
+                restart = restart_history[idx][group_name]
+                steps_from_alert = alert_prediction_steps_history[idx][group_name]
+                restart_steps = restart_steps_history[idx][group_name]
 
-                fig.add_trace(
-                    go.Scatter(x=[time_idx],
-                               y=y_value,
-                               hovertext="StepsFromAlert: {},"
-                                         "Action: {}, "
-                                         "Reward: {}, "
-                                         "Terminal: {}"
-                                         "".format(steps_from_alert_per_series_list[series],
-                                                   action_per_series_list[series],
-                                                   reward,
-                                                   terminal_per_series_list[series]),
-                               mode="markers",
-                               showlegend=False,
-                               marker=dict(
-                                   color="purple"
-                                   if terminal_per_series_list[series]
-                                   else 'green' if not action_per_series_list[series]
-                                   else "red"
-                               )
-                               )
-                )
+                fig = self._add_group_step_decision_to_plot(fig,
+                                                            test_df,
+                                                            group_name,
+                                                            time_idx,
+                                                            reward,
+                                                            action,
+                                                            terminal,
+                                                            restart,
+                                                            steps_from_alert,
+                                                            restart_steps)
 
-        fig.update_xaxes(title_text="<b>time_idx</b>")
-        fig.update_yaxes(title_text="<b>Actual</b>")
-        fig.write_html('render_6.html')
+            fig.update_xaxes(title_text="<b>time_idx</b>")
+            fig.update_yaxes(title_text="<b>Actual</b>")
+            fig.write_html('render_synthetic_{}.html'.format(group_name))
+
+    def _add_group_y_value_plot(self, fig, test_df, group_name, time_idx_list):
+        group_y = list(test_df[(test_df[self.config.get("GroupKeyword")] == group_name)
+                               & (test_df.time_idx.isin(time_idx_list))]
+                       [self.config.get("ValueKeyword")].values)
+        fig.add_trace(
+            go.Scatter(x=time_idx_list, y=group_y, name="Group: {}".format(group_name),
+                       line=dict(color='royalblue', width=1))
+        )
+
+        return fig
+
+    def _add_group_step_decision_to_plot(self,
+                                         fig,
+                                         test_df,
+                                         group_name,
+                                         time_idx,
+                                         reward,
+                                         action,
+                                         terminal,
+                                         restart,
+                                         steps_from_alert,
+                                         restart_steps):
+        y_value = list(
+            test_df[(test_df[self.config.get("GroupKeyword")] == group_name) & (test_df.time_idx == time_idx)]
+            [self.config.get("ValueKeyword")].values)
+
+        fig.add_trace(
+            go.Scatter(x=[time_idx],
+                       y=y_value,
+                       hovertext="StepsFromAlert: {}, \n"
+                                 "RestartSteps: {}, \n"
+                                 "Action: {}, \n"
+                                 "Reward: {}, \n"
+                                 "Terminal: {}, \n"
+                                 "Restart: {}"
+                                 "".format(steps_from_alert,
+                                           restart_steps,
+                                           action,
+                                           reward,
+                                           terminal,
+                                           restart),
+                       mode="markers",
+                       showlegend=False,
+                       marker=dict(
+                           color="orange" if restart else
+                           "purple" if terminal else
+                           'green' if not action
+                           else "red"
+                       )
+                       )
+        )
+        return fig
 
     def _get_num_iterations(self, test_df):
         num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - self.env.model_enc_len + 3
         return num_iterations
+
+    def _get_min_test_time_idx(self, test_df):
+        return test_df.time_idx.min() + self.config.get("EncoderLength") - 1
