@@ -181,4 +181,4 @@ def plot_synthetic_data(config, data_to_plot):
 def plot_fisherman_data(data_to_plot):
     # data_ = data[data.Type == 'internaltemp']
     fig = px.line(data_to_plot, y="Value", x="time_idx", color='Sensor')
-    fig.write_html('fisherman.html')
+    fig.write_html('fisherman_5.html')

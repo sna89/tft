@@ -1,5 +1,5 @@
-from thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
-from thts.node import DecisionNode, ChanceNode
+from Algorithms.thts import TrialBasedHeuristicTree
+from Algorithms.thts import DecisionNode, ChanceNode
 
 
 class DpUCT(TrialBasedHeuristicTree):

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import datetime
-from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names
+from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names, get_group_idx_mapping
 import os
 from config import DATETIME_COLUMN
 from data_utils import add_dt_columns
@@ -25,7 +25,7 @@ class AdEnv(gym.Env):
 
         self.val_df = val_df
         self.test_df = test_df
-        self.group_idx_mapping = self._get_group_idx_mapping()
+        self.group_idx_mapping = get_group_idx_mapping(self.config, self.model, self.test_df)
         self.last_date = self._get_last_date(self.val_df)
         self.last_time_idx = self._get_last_time_idx(self.val_df)
 
@@ -176,10 +176,4 @@ class AdEnv(gym.Env):
                           zip(range(self.config.get("Series")), prediction)}
         return prediction
 
-    def _get_group_idx_mapping(self):
-        if isinstance(self.model.hparams.embedding_labels, dict) and \
-                self.config.get("GroupKeyword") in self.model.hparams.embedding_labels:
-            return self.model.hparams.embedding_labels[self.config.get("GroupKeyword")]
-        else:
-            group_name_list = list(self.test_df[self.config.get("GroupKeyword")].unique())
-            return {group_name: group_name for group_name in group_name_list}
+

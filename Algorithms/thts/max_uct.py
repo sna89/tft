@@ -1,5 +1,5 @@
-from thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
-from thts.node import DecisionNode, ChanceNode
+from Algorithms.thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
+from Algorithms.thts.node import DecisionNode, ChanceNode
 
 
 class MaxUCT(TrialBasedHeuristicTree):

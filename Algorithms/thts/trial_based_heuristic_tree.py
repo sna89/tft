@@ -1,8 +1,9 @@
-from thts.node import DecisionNode, ChanceNode
+from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 from utils import get_argmax_from_list, set_env_to_state
 from env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
-    get_group_lower_and_upper_bounds, get_group_state, get_group_names
+    get_group_lower_and_upper_bounds, get_group_state, get_group_names, get_num_iterations, \
+    is_group_prediction_out_of_bound
 import time
 import plotly.graph_objects as go
 import pandas as pd
@@ -46,7 +47,7 @@ class TrialBasedHeuristicTree:
             alert_prediction_steps_history = []
             restart_steps_history = []
 
-            num_iterations = self._get_num_iterations(test_df)
+            num_iterations = get_num_iterations(test_df, self.env.model_enc_len)
             for iteration in range(1, num_iterations):
                 start = time.time()
                 action, run_time = self._before_transition(current_node)
@@ -140,15 +141,7 @@ class TrialBasedHeuristicTree:
 
     def group_prediction_exceed_bounds(self, group_prediction, group_name: str):
         lb, ub = get_group_lower_and_upper_bounds(self.config, group_name)
-        out_of_bound = torch.sum((torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)))
-        if out_of_bound > 0:
-            return True
-        else:
-            return False
-
-    @staticmethod
-    def alert_condition(value, lower_bound, upper_bound):
-        return
+        return is_group_prediction_out_of_bound(group_prediction, lb, ub)
 
     def _after_transition(self, next_state: EnvState, env_terminal_list: dict):
         for idx, group_state in enumerate(next_state.env_state):
@@ -375,10 +368,6 @@ class TrialBasedHeuristicTree:
                        )
         )
         return fig
-
-    def _get_num_iterations(self, test_df):
-        num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - self.env.model_enc_len + 3
-        return num_iterations
 
     def _get_min_test_time_idx(self, test_df):
         return test_df.time_idx.min() + self.config.get("EncoderLength") - 1
