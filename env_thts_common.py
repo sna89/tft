@@ -206,9 +206,10 @@ def calc_reward(config: dict,
                 missed_alert: bool,
                 current_steps_from_alert: int,
                 max_steps_from_alert: int):
-    reward_false_alert = config["Env"]["Rewards"]["FalseAlert"]
-    reward_missed_alert = config["Env"]["Rewards"]["MissedAlert"]
-    reward_good_alert = config["Env"]["Rewards"]["GoodAlert"]
+
+    reward_false_alert = config.get("Env").get("Rewards").get("FalseAlert")
+    reward_missed_alert = config.get("Env").get("Rewards").get("MissedAlert")
+    reward_good_alert = config.get("Env").get("Rewards").get("GoodAlert")
 
     if good_alert:
         return calc_good_alert_reward(current_steps_from_alert, max_steps_from_alert, reward_good_alert)
@@ -320,8 +321,9 @@ def get_group_idx_mapping(config, model, test_df):
 
 
 def is_group_prediction_out_of_bound(group_prediction, lb, ub):
-    out_of_bound = torch.sum((torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)))
-    if out_of_bound > 0:
-        return True
+    out_of_bound = torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)
+    if sum(out_of_bound) > 0:
+        idx = (out_of_bound == 1).nonzero()[0].item()
+        return True, idx
     else:
-        return False
+        return False, -1

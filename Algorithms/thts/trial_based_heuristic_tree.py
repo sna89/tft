@@ -8,7 +8,7 @@ import time
 import plotly.graph_objects as go
 import pandas as pd
 from typing import Dict, List
-import torch
+from Algorithms.render import render
 
 
 class TrialBasedHeuristicTree:
@@ -28,10 +28,6 @@ class TrialBasedHeuristicTree:
         self.alert_prediction_steps = self.env.max_steps_from_alert
         self.consider_trial_length = True
         self.restart_env_iterations = self.env.max_restart_steps
-
-    def get_initial_state(self):
-        initial_state = self.env.reset()
-        return initial_state
 
     def run(self, test_df):
         state = self.get_initial_state()
@@ -73,22 +69,28 @@ class TrialBasedHeuristicTree:
                                                        for group_state
                                                        in current_node.state.env_state})
                 restart_steps_history.append({group_state.series: group_state.restart_steps
-                                                       for group_state
-                                                       in current_node.state.env_state})
+                                              for group_state
+                                              in current_node.state.env_state})
 
                 end = time.time()
                 run_time = end - start
 
-                self.render(test_df,
-                            run_time,
-                            action_history,
-                            reward_history,
-                            terminal_history,
-                            restart_history,
-                            alert_prediction_steps_history,
-                            restart_steps_history)
+                render(self.config,
+                       self.group_names,
+                       test_df,
+                       run_time,
+                       action_history,
+                       reward_history,
+                       terminal_history,
+                       restart_history,
+                       alert_prediction_steps_history,
+                       restart_steps_history)
 
                 current_node = DecisionNode(next_state, parent=current_node, terminal=False)
+
+    def get_initial_state(self):
+        initial_state = self.env.reset()
+        return initial_state
 
     def _before_transition(self, current_node: DecisionNode):
         action = 0
@@ -270,104 +272,3 @@ class TrialBasedHeuristicTree:
                             action_dict)
 
         return next_state, next_state_terminal, next_state_restart, reward
-
-    def render(self,
-               test_df: pd.DataFrame(),
-               run_time: float,
-               action_history: List[Dict],
-               reward_history: List[float],
-               terminal_history: List[Dict],
-               restart_history: List[Dict],
-               alert_prediction_steps_history: List[Dict],
-               restart_steps_history: List[Dict]):
-
-        print("Action: {}".format(action_history[-1]))
-        print("Reward: {}".format(reward_history[-1]))
-        print("Iteration RunTime: {}".format(run_time))
-
-        min_test_time_idx = self._get_min_test_time_idx(test_df)
-        time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
-
-        for group_name in self.group_names:
-            fig = go.Figure()
-            fig = self._add_group_y_value_plot(fig, test_df, group_name, time_idx_list)
-
-            current_time_idx_list = list(time_idx_list[:len(action_history)])
-            for idx, time_idx in enumerate(current_time_idx_list):
-                reward = reward_history[idx]
-                action = action_history[idx][group_name]
-                terminal = terminal_history[idx][group_name]
-                restart = restart_history[idx][group_name]
-                steps_from_alert = alert_prediction_steps_history[idx][group_name]
-                restart_steps = restart_steps_history[idx][group_name]
-
-                fig = self._add_group_step_decision_to_plot(fig,
-                                                            test_df,
-                                                            group_name,
-                                                            time_idx,
-                                                            reward,
-                                                            action,
-                                                            terminal,
-                                                            restart,
-                                                            steps_from_alert,
-                                                            restart_steps)
-
-            fig.update_xaxes(title_text="<b>time_idx</b>")
-            fig.update_yaxes(title_text="<b>Actual</b>")
-            fig.write_html('render_synthetic_{}.html'.format(group_name))
-
-    def _add_group_y_value_plot(self, fig, test_df, group_name, time_idx_list):
-        group_y = list(test_df[(test_df[self.config.get("GroupKeyword")] == group_name)
-                               & (test_df.time_idx.isin(time_idx_list))]
-                       [self.config.get("ValueKeyword")].values)
-        fig.add_trace(
-            go.Scatter(x=time_idx_list, y=group_y, name="Group: {}".format(group_name),
-                       line=dict(color='royalblue', width=1))
-        )
-
-        return fig
-
-    def _add_group_step_decision_to_plot(self,
-                                         fig,
-                                         test_df,
-                                         group_name,
-                                         time_idx,
-                                         reward,
-                                         action,
-                                         terminal,
-                                         restart,
-                                         steps_from_alert,
-                                         restart_steps):
-        y_value = list(
-            test_df[(test_df[self.config.get("GroupKeyword")] == group_name) & (test_df.time_idx == time_idx)]
-            [self.config.get("ValueKeyword")].values)
-
-        fig.add_trace(
-            go.Scatter(x=[time_idx],
-                       y=y_value,
-                       hovertext="StepsFromAlert: {}, \n"
-                                 "RestartSteps: {}, \n"
-                                 "Action: {}, \n"
-                                 "Reward: {}, \n"
-                                 "Terminal: {}, \n"
-                                 "Restart: {}"
-                                 "".format(steps_from_alert,
-                                           restart_steps,
-                                           action,
-                                           reward,
-                                           terminal,
-                                           restart),
-                       mode="markers",
-                       showlegend=False,
-                       marker=dict(
-                           color="orange" if restart else
-                           "purple" if terminal else
-                           'green' if not action
-                           else "red"
-                       )
-                       )
-        )
-        return fig
-
-    def _get_min_test_time_idx(self, test_df):
-        return test_df.time_idx.min() + self.config.get("EncoderLength") - 1

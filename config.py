@@ -151,7 +151,7 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "AlertMaxPredictionSteps": 3,
+            "AlertMaxPredictionSteps": 7,
             "AlertMinPredictionSteps": 0,
             "RestartSteps": 3,
             "Rewards": {
