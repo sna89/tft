@@ -42,6 +42,7 @@ class TrajectorySample:
         alert_prediction_steps_history = [{group_name: self.max_steps_from_alert for group_name in self.group_names}]
         restart_steps_history = [{group_name: self.max_restart_steps for group_name in self.group_names}]
 
+        statistics = self._init_statistics()
         for iteration in range(1, num_iterations):
             start = time.time()
 
@@ -55,7 +56,7 @@ class TrajectorySample:
                                                                       terminal_history[-1],
                                                                       restart_history[-1],
                                                                       alert_prediction_steps_history[-1])
-            reward, \
+            reward_group_mapping, \
             next_state_group_terminal_mapping, \
             next_state_group_restart_mapping, \
             next_state_group_restart_steps_mapping, \
@@ -66,8 +67,10 @@ class TrajectorySample:
                                                                                   restart_steps_history[-1],
                                                                                   next_state_df)
 
+            statistics = self._update_statistics(statistics, reward_group_mapping, action_group_mapping_dict)
+
             action_history.append(action_group_mapping_dict)
-            reward_history.append(reward)
+            reward_history.append(reward_group_mapping)
             terminal_history.append(next_state_group_terminal_mapping)
             restart_history.append(next_state_group_restart_mapping)
             restart_steps_history.append(next_state_group_restart_steps_mapping)
@@ -87,6 +90,8 @@ class TrajectorySample:
                    alert_prediction_steps_history,
                    restart_steps_history)
 
+        print(statistics)
+
     def _choose_action_per_group(self,
                                  prediction,
                                  terminal_mapping_previous_state,
@@ -102,37 +107,33 @@ class TrajectorySample:
         for group_name, actions in self.group_action_product_dict.items():
             if group_name in feasible_alert_groups:
                 group_action_scores = []
-                group_prediction_trajectories_samples = \
-                    prediction[self.group_idx_mapping[group_name]][:self.max_steps_from_alert].T
-                lb = self.rollout_policy[group_name]['lb']
-                ub = self.rollout_policy[group_name]['ub']
+                out_of_bound_list_tuple, _ = self._get_out_ob_bound_list_tuple(prediction, group_name)
                 for action in actions:
                     score = 0
-                    for group_prediction_trajectory_sample in group_prediction_trajectories_samples:
-                        out_of_bound, out_of_bound_idx = is_group_prediction_out_of_bound(
-                            group_prediction_trajectory_sample, lb, ub)
-
+                    for out_of_bound, out_of_bound_idx in out_of_bound_list_tuple:
+                        reward = 0
                         if action == 0 and out_of_bound:
-                            score += calc_reward(self.config,
+                            reward = calc_reward(self.config,
                                                  good_alert=False,
                                                  false_alert=False,
                                                  missed_alert=True,
                                                  current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
                                                  max_steps_from_alert=self.max_steps_from_alert)
                         elif action == 1 and out_of_bound:
-                            score += calc_reward(self.config,
+                            reward = calc_reward(self.config,
                                                  good_alert=True,
                                                  false_alert=False,
                                                  missed_alert=False,
                                                  current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
                                                  max_steps_from_alert=self.max_steps_from_alert)
                         elif action == 1 and not out_of_bound:
-                            score += calc_reward(self.config,
+                            reward = calc_reward(self.config,
                                                  good_alert=False,
                                                  false_alert=True,
                                                  missed_alert=False,
                                                  current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
                                                  max_steps_from_alert=self.max_steps_from_alert)
+                        score += reward
                     group_action_scores.append(score)
             else:
                 group_action_scores = [1, -1]
@@ -164,13 +165,15 @@ class TrajectorySample:
                              previous_state_alert_prediction_steps_dict,
                              previous_state_restart_steps_dict,
                              next_state_df):
-        reward = 0
+
+        reward_group_mapping = {}
         next_state_group_terminal_mapping = {}
         next_state_group_restart_mapping = {}
         next_state_group_restart_steps_mapping = {}
         next_state_group_steps_from_alert_mapping = {}
 
         for group_name in self.group_names:
+            reward = 0
             action = action_group_mapping_dict[group_name]
             group_terminal = previous_state_terminal_dict[group_name]
             group_restart = previous_state_restart_dict[group_name]
@@ -178,7 +181,7 @@ class TrajectorySample:
             group_steps_from_alert = previous_state_alert_prediction_steps_dict[group_name]
 
             next_state_group_value = float(next_state_df[next_state_df[self.config.get("GroupKeyword")] == group_name][
-                self.config.get("ValueKeyword")])
+                                               self.config.get("ValueKeyword")])
             group_next_state_terminal = is_state_terminal(self.config, group_name, next_state_group_value)
             next_state_group_terminal_mapping[group_name] = group_next_state_terminal
 
@@ -249,11 +252,24 @@ class TrajectorySample:
                                               current_steps_from_alert=group_steps_from_alert,
                                               max_steps_from_alert=self.max_steps_from_alert)
 
-        return reward, \
+            reward_group_mapping[group_name] = reward
+
+        return reward_group_mapping, \
                next_state_group_terminal_mapping, \
                next_state_group_restart_mapping, \
                next_state_group_restart_steps_mapping, \
                next_state_group_steps_from_alert_mapping
+
+    def _get_out_ob_bound_list_tuple(self, prediction, group_name):
+        group_prediction_trajectories_samples = \
+            prediction[self.group_idx_mapping[group_name]][:self.max_steps_from_alert].T
+        lb = self.rollout_policy[group_name]['lb']
+        ub = self.rollout_policy[group_name]['ub']
+        out_of_bound_list_tuple = list(map(lambda x: is_group_prediction_out_of_bound(
+            x, lb, ub), group_prediction_trajectories_samples))
+        is_out_of_bound_list = [out_of_bound for out_of_bound, out_of_bound_idx in out_of_bound_list_tuple]
+        out_of_bound_percent = sum(np.where(is_out_of_bound_list, 1, 0)) / float(len(out_of_bound_list_tuple))
+        return out_of_bound_list_tuple, out_of_bound_percent
 
     def _build_prediction_df(self, prediction_df: pd.DataFrame, iteration):
         start_time_idx_test_df = self.val_df.time_idx.max() + 1
@@ -280,3 +296,40 @@ class TrajectorySample:
             policy[group_name]['lb'] = lb + 0.3
             policy[group_name]['ub'] = ub - 0.3
         return policy
+
+    def _init_statistics(self):
+        statistics = {}
+        for group_name in self.group_names:
+            statistics[group_name] = {
+                "TP": 0,
+                "FN": 0,
+                "FP": 0,
+                "TN": 0
+            }
+        return statistics
+
+    def _update_statistics(self, statistics, reward_group_mapping, action_group_mapping_dict):
+        reward_false_alert = self.config.get("Env").get("Rewards").get("FalseAlert")
+        reward_missed_alert = self.config.get("Env").get("Rewards").get("MissedAlert")
+
+        for group_name in self.group_names:
+            group_statistics = statistics[group_name]
+            reward = reward_group_mapping[group_name]
+            action = action_group_mapping_dict[group_name]
+
+            if reward == 0:
+                group_statistics["TN"] += 1
+            elif reward > 0:
+                group_statistics["TP"] += 1
+            elif reward < 0:
+                if reward_missed_alert != reward_false_alert:
+                    if reward == reward_missed_alert:
+                        group_statistics["FN"] += 1
+                    elif reward == reward_false_alert:
+                        group_statistics["FP"] += 1
+                else:
+                    if action == 0:
+                        group_statistics["FN"] += 1
+                    elif action == 1:
+                        group_statistics["FP"] += 1
+        return statistics

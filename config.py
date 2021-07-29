@@ -112,16 +112,16 @@ def get_config(dataset_name):
                 },
                 "Fisherman": {
                     "U100330": {
-                        "lb": -15.5,
-                        "hb": -10,
+                        "lb": -17,
+                        "hb": -11,
                     },
                     # "U100314": {
                     #     "lb": -20,
                     #     "hb": 22,
                     # },
                     "U100329": {
-                        "lb": 3.3,
-                        "hb": 5.5,
+                        "lb": 1,
+                        "hb": 6,
                     },
                     "U100337": {
                         "lb": 0,
@@ -133,19 +133,19 @@ def get_config(dataset_name):
                     # },
                     # "U100312": {
                     #     "lb": 0,
-                    #     "hb": 4,
+                    #     "hb": 4.5,
                     # },
                     "U100309": {
-                        "lb": 1,
-                        "hb": 5,
+                        "lb": 0,
+                        "hb": 8,
                     },
                     "U100310": {
-                        "lb": 8,
+                        "lb": 4,
                         "hb": 14,
                     },
                     # "U106755": {
-                    #     "lb": 15,
-                    #     "hb": 30,
+                    #     "lb": 13,
+                    #     "hb": 28,
                     # },
                 }
 
@@ -155,7 +155,7 @@ def get_config(dataset_name):
             "AlertMinPredictionSteps": 0,
             "RestartSteps": 3,
             "Rewards": {
-                "MissedAlert": -1000,
+                "MissedAlert": -100,
                 "FalseAlert": -100,
                 "GoodAlert": 10,
             }

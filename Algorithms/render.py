@@ -66,7 +66,7 @@ def render(config,
            test_df: pd.DataFrame(),
            run_time: float,
            action_history: List[Dict],
-           reward_history: List[float],
+           reward_history: List[Dict],
            terminal_history: List[Dict],
            restart_history: List[Dict],
            alert_prediction_steps_history: List[Dict],
@@ -85,7 +85,7 @@ def render(config,
 
         current_time_idx_list = list(time_idx_list[:len(action_history)])
         for idx, time_idx in enumerate(current_time_idx_list):
-            reward = reward_history[idx]
+            reward = reward_history[idx][group_name]
             action = action_history[idx][group_name]
             terminal = terminal_history[idx][group_name]
             restart = restart_history[idx][group_name]

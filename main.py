@@ -62,7 +62,7 @@ if __name__ == '__main__':
     save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit)
     ad_env = gym.make("gym_ad:ad-v0")
-    # evaluate(fitted_model, test_dl, ad_env)
+    evaluate(fitted_model, test_dl, ad_env)
     # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name, model_name)
     # thts = MaxUCT(ad_env, config)
     # thts.run(test_df)
