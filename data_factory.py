@@ -2,6 +2,7 @@ from DataBuilders.fisherman import FishermanDataBuilder
 from DataBuilders.stallion import StallionDataBuilder
 from DataBuilders.synthetic import SyntheticDataBuilder
 from DataBuilders.electricity import ElectricityDataBuilder
+from DataBuilders.straus import StrausDataBuilder
 
 
 def get_data_builder(config, dataset_name):
@@ -13,5 +14,7 @@ def get_data_builder(config, dataset_name):
         return StallionDataBuilder(config)
     elif dataset_name == "Electricity":
         return ElectricityDataBuilder(config)
+    elif dataset_name == "Straus":
+        return StrausDataBuilder(config)
     else:
         raise ValueError()

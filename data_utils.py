@@ -29,6 +29,8 @@ def add_dt_columns(data: Union[pd.DataFrame, Dict], dt_attributes: List = []):
             data['month'] = data[DATETIME_COLUMN].dt.month.astype(str).astype("category")
         if 'year' in dt_attributes:
             data['year'] = data[DATETIME_COLUMN].dt.year.astype(str).astype("category")
+        if 'second' in dt_attributes:
+            data['second'] = data[DATETIME_COLUMN].dt.second.astype(str).astype("category")
         if 'is_weekend' in dt_attributes:
             if 'day_of_week' in dt_attributes:
                 data['is_weekend'] = data.apply(lambda row: 1 if row['day_of_week'] in ['4', '5'] else 0, axis=1)

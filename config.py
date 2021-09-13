@@ -60,7 +60,8 @@ def get_config(dataset_name):
             "PredictionLength": 7,
             "GroupKeyword": "Sensor",
             "ValueKeyword": "Value",
-            "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week']
+            "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
+            "Resample": "False"
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
@@ -82,11 +83,24 @@ def get_config(dataset_name):
             "EncoderLength": 14,
             "PredictionLength": 7,
         },
+        "Straus": {
+            "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
+            "TestDataFramePicklePath": os.path.join('pkl', 'straus_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join('pkl', 'straus_val_df.pkl'),
+            "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Straus'),
+            "ProcessedDataPath": os.path.join('pkl', 'straus_processed_df.pkl'),
+            "GroupKeyword": "key",
+            "GroupColumns": ['PartId', 'OrderStepId', 'QmpId'],
+            "ValueKeyword": "ActualValue",
+            "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute', 'second'],
+            "EncoderLength": 240,
+            "PredictionLength": 10,
+        }
     }
 
     train_config = {
         "Train": {
-            "BatchSize": 32,
+            "BatchSize": 128,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0
@@ -112,20 +126,20 @@ def get_config(dataset_name):
                 },
                 "Fisherman": {
                     "U100330": {
-                        "lb": -17,
-                        "hb": -11,
+                        "lb": -22,
+                        "hb": -8,
                     },
                     # "U100314": {
                     #     "lb": -20,
                     #     "hb": 22,
                     # },
                     "U100329": {
-                        "lb": 1,
-                        "hb": 6,
+                        "lb": 0,
+                        "hb": 11,
                     },
                     "U100337": {
-                        "lb": 0,
-                        "hb": 4,
+                        "lb": -2,
+                        "hb": 11,
                     },
                     # "U106724": {
                     #     "lb": -1,
@@ -136,12 +150,12 @@ def get_config(dataset_name):
                     #     "hb": 4.5,
                     # },
                     "U100309": {
-                        "lb": 0,
-                        "hb": 8,
+                        "lb": -5,
+                        "hb": 12,
                     },
                     "U100310": {
                         "lb": 4,
-                        "hb": 14,
+                        "hb": 17,
                     },
                     # "U106755": {
                     #     "lb": 13,
@@ -161,8 +175,8 @@ def get_config(dataset_name):
             }
         },
         "THTS": {
-            "NumTrials": 50,
-            "TrialLength": 5,
+            "NumTrials": 75,
+            "TrialLength": 6,
             "UCTBias": np.sqrt(2),
             "Runs": 1
         }

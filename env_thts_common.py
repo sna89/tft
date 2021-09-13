@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Union
 from dataclasses import dataclass, field
 from torch import Tensor
 from Algorithms.thts.node import DecisionNode
@@ -121,20 +121,17 @@ def build_next_state(env_name,
     return next_state, terminal_states, restart_states
 
 
-def get_reward(env_name, config, group_names, next_state_terminal_dict, current_state, action_dict: Dict):
+def get_reward(env_name, config, group_names, next_state_terminal_dict, current_state, action_dict: Dict) \
+        -> Union[Dict, float]:
     assert env_name in ["simulation", "real"]
     max_steps_from_alert = config.get("Env").get("AlertMaxPredictionSteps") + 1
     min_steps_from_alert = config.get("Env").get("AlertMinPredictionSteps") + 1
     max_restart_steps = config.get("Env").get("RestartSteps") + 1
 
-    reward = 0
-    any_false_alert = False
-    false_alert = False
-    good_alert = False
-    missed_alert = False
-    current_steps_from_alert = current_state.env_state[0].steps_from_alert
+    reward_group_mapping = {}
 
     for group_name in group_names:
+        reward = 0
         current_group_state = get_group_state(current_state.env_state, group_name)
 
         current_state_restart = is_state_restart(current_group_state.restart_steps,
@@ -144,6 +141,7 @@ def get_reward(env_name, config, group_names, next_state_terminal_dict, current_
                                                    current_group_state.temperature,
                                                    current_state_restart)
         if current_state_restart or current_state_terminal:
+            reward_group_mapping[group_name] = reward
             continue
 
         next_state_terminal = next_state_terminal_dict[group_name]
@@ -154,29 +152,21 @@ def get_reward(env_name, config, group_names, next_state_terminal_dict, current_
                                                                           max_steps_from_alert,
                                                                           next_state_terminal,
                                                                           action)
-        if env_name == "simulation":
-            if false_alert:
-                any_false_alert = True
-            if good_alert or missed_alert:
-                break
-        elif env_name == "real":
-            reward += calc_reward(config,
-                                  good_alert,
-                                  false_alert,
-                                  missed_alert,
-                                  current_group_state.steps_from_alert,
-                                  max_steps_from_alert)
 
-    if env_name == "simulation":
-        if any_false_alert and not good_alert:
-            false_alert = True
         reward += calc_reward(config,
                               good_alert,
                               false_alert,
                               missed_alert,
-                              current_steps_from_alert,
+                              current_group_state.steps_from_alert,
                               max_steps_from_alert)
+        reward_group_mapping[group_name] = reward
 
+    if env_name == "simulation":
+        reward = sum([reward for group_name, reward in reward_group_mapping.items()]) / float(len(reward_group_mapping))
+    elif env_name == "real":
+        reward = reward_group_mapping
+    else:
+        raise ValueError
     return reward
 
 

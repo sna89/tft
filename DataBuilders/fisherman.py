@@ -48,14 +48,15 @@ class FishermanDataBuilder(DataBuilder):
         data = filter_df_by_date(data, min_date, max_date)
         data.drop_duplicates(inplace=True)
         sensor = data[self.config.get("GroupKeyword")].iloc[0]
-        data_3h = data.set_index(DATETIME_COLUMN).resample('3H').mean()
-        data_3h.fillna(method='bfill', inplace=True)
-        data_3h[self.config.get("GroupKeyword")] = sensor
-        data_3h[DATETIME_COLUMN] = data_3h.index
-        data_3h = add_dt_columns(data_3h, self.config.get("DatetimeAdditionalColumns"))
-        data_3h.reset_index(inplace=True, drop=True)
-        data_3h['time_idx'] = data_3h.apply(lambda x: FishermanDataBuilder.set_row_time_idx(x), axis=1)
-        return data_3h
+        if self.config.get("Resample") == "True":
+            data = data.set_index(DATETIME_COLUMN).resample('3H').mean()
+            data[DATETIME_COLUMN] = data.index
+        data.fillna(method='bfill', inplace=True)
+        data[self.config.get("GroupKeyword")] = sensor
+        data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
+        data.reset_index(inplace=True, drop=True)
+        data['time_idx'] = data.apply(lambda x: FishermanDataBuilder.set_row_time_idx(x), axis=1)
+        return data
 
     def define_ts_ds(self, train_df):
         fisherman_train_ts_ds = TimeSeriesDataSet(
@@ -80,7 +81,8 @@ class FishermanDataBuilder(DataBuilder):
             # ),
             add_relative_time_idx=True,
             add_target_scales=True,
-            add_encoder_length=False
+            add_encoder_length=False,
+            allow_missings=True
         )
         return fisherman_train_ts_ds
 

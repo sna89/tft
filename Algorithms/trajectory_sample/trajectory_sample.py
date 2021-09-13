@@ -6,6 +6,7 @@ import os
 import numpy as np
 import time
 from Algorithms.render import render
+from Algorithms.statistics import init_statistics, update_statistics
 
 
 class TrajectorySample:
@@ -42,7 +43,7 @@ class TrajectorySample:
         alert_prediction_steps_history = [{group_name: self.max_steps_from_alert for group_name in self.group_names}]
         restart_steps_history = [{group_name: self.max_restart_steps for group_name in self.group_names}]
 
-        statistics = self._init_statistics()
+        statistics = init_statistics(self.group_names)
         for iteration in range(1, num_iterations):
             start = time.time()
 
@@ -67,7 +68,7 @@ class TrajectorySample:
                                                                                   restart_steps_history[-1],
                                                                                   next_state_df)
 
-            statistics = self._update_statistics(statistics, reward_group_mapping, action_group_mapping_dict)
+            statistics = update_statistics(self.config, self.group_names, statistics, reward_group_mapping, action_group_mapping_dict)
 
             action_history.append(action_group_mapping_dict)
             reward_history.append(reward_group_mapping)
@@ -79,16 +80,21 @@ class TrajectorySample:
             end = time.time()
             run_time = end - start
 
-            render(self.config,
-                   self.group_names,
-                   self.test_df,
-                   run_time,
-                   action_history,
-                   reward_history,
-                   terminal_history,
-                   restart_history,
-                   alert_prediction_steps_history,
-                   restart_steps_history)
+            if iteration % 100 == 0:
+                print("Action: {}".format(action_history[-1]))
+                print("Reward: {}".format(reward_history[-1]))
+                print("Iteration: {} RunTime: {}".format(iteration, run_time))
+
+                render(self.config,
+                       self.group_names,
+                       self.test_df,
+                       run_time,
+                       action_history,
+                       reward_history,
+                       terminal_history,
+                       restart_history,
+                       alert_prediction_steps_history,
+                       restart_steps_history)
 
         print(statistics)
 
@@ -296,40 +302,3 @@ class TrajectorySample:
             policy[group_name]['lb'] = lb + 0.3
             policy[group_name]['ub'] = ub - 0.3
         return policy
-
-    def _init_statistics(self):
-        statistics = {}
-        for group_name in self.group_names:
-            statistics[group_name] = {
-                "TP": 0,
-                "FN": 0,
-                "FP": 0,
-                "TN": 0
-            }
-        return statistics
-
-    def _update_statistics(self, statistics, reward_group_mapping, action_group_mapping_dict):
-        reward_false_alert = self.config.get("Env").get("Rewards").get("FalseAlert")
-        reward_missed_alert = self.config.get("Env").get("Rewards").get("MissedAlert")
-
-        for group_name in self.group_names:
-            group_statistics = statistics[group_name]
-            reward = reward_group_mapping[group_name]
-            action = action_group_mapping_dict[group_name]
-
-            if reward == 0:
-                group_statistics["TN"] += 1
-            elif reward > 0:
-                group_statistics["TP"] += 1
-            elif reward < 0:
-                if reward_missed_alert != reward_false_alert:
-                    if reward == reward_missed_alert:
-                        group_statistics["FN"] += 1
-                    elif reward == reward_false_alert:
-                        group_statistics["FP"] += 1
-                else:
-                    if action == 0:
-                        group_statistics["FN"] += 1
-                    elif action == 1:
-                        group_statistics["FP"] += 1
-        return statistics

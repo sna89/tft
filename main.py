@@ -39,7 +39,12 @@ def optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fi
         study = optimize_deepar_hp(config, train_dl, val_dl)
         model = create_deepar_model(train_ts_ds, None)
 
-    gradient_clip_val = study.best_params['gradient_clip_val']
+    if study:
+        gradient_clip_val = study.best_params['gradient_clip_val']
+    else:
+        # gradient_clip_val = 0.03
+        gradient_clip_val = 0.0106
+
     trainer = create_trainer(gradient_clip_val)
     if to_fit:
         trainer = fit(trainer, model, train_dl, val_dl)
@@ -57,14 +62,14 @@ if __name__ == '__main__':
     config = get_config(dataset_name)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl \
         = build_data(config, dataset_name)
-    plot_data(config, dataset_name, pd.concat([train_df, val_df, test_df], axis=0))
+    # plot_data(config, dataset_name, pd.concat([train_df, val_df, test_df], axis=0))
     save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
     save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit)
-    ad_env = gym.make("gym_ad:ad-v0")
-    evaluate(fitted_model, test_dl, ad_env)
-    # plot_predictions(fitted_model, test_dl, test_df, config, dataset_name, model_name)
+    # ad_env = gym.make("gym_ad:ad-v0")
+    evaluate(fitted_model, test_dl)
+    plot_predictions(config, fitted_model, test_dl, test_df, dataset_name, model_name)
     # thts = MaxUCT(ad_env, config)
     # thts.run(test_df)
-    trajectory_sample = TrajectorySample(ad_env, config, fitted_model, val_df, test_df, num_trajectories=5000)
-    trajectory_sample.run()
+    # trajectory_sample = TrajectorySample(ad_env, config, fitted_model, val_df, test_df, num_trajectories=5000)
+    # trajectory_sample.run()

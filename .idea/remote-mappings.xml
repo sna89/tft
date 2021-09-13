@@ -6,7 +6,7 @@
         <remote-mappings server-id="python@sftp://sna89@132.68.161.40:22/home/sna89/TFTVenv/bin/python3.8">
           <settings>
             <list>
-              <mapping local-root="$PROJECT_DIR$" remote-root="/tmp/pycharm_project_99" />
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/sna89/pycharm_project_99" />
             </list>
           </settings>
         </remote-mappings>

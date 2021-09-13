@@ -72,10 +72,6 @@ def render(config,
            alert_prediction_steps_history: List[Dict],
            restart_steps_history: List[Dict]):
 
-    print("Action: {}".format(action_history[-1]))
-    print("Reward: {}".format(reward_history[-1]))
-    print("Iteration RunTime: {}".format(run_time))
-
     min_test_time_idx = get_min_test_time_idx(config, test_df)
     time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
 

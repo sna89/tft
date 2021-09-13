@@ -32,9 +32,9 @@ def create_deepar_model(train_ts_ds, study=None):
     else:
         deepar = DeepAR.from_dataset(
             train_ts_ds,
-            learning_rate=0.1071,
-            hidden_size=25,
-            dropout=0.164,
+            learning_rate=0.00006,
+            hidden_size=64,
+            dropout=0.057,
             log_interval=10,
             log_val_interval=3,
             loss=NormalDistributionLoss(quantiles=[0.1, 0.3, 0.5, 0.7, 0.9])

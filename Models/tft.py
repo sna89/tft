@@ -1,5 +1,5 @@
 from pytorch_forecasting import TemporalFusionTransformer
-from pytorch_forecasting.metrics import QuantileLoss
+from pytorch_forecasting.metrics import QuantileLoss, CrossEntropy
 from pytorch_forecasting.models.temporal_fusion_transformer.tuning import optimize_hyperparameters
 from pytorch_forecasting import TimeSeriesDataSet
 from utils import save_to_pickle, load_pickle
@@ -7,6 +7,7 @@ import os
 
 
 def optimize_tft_hp(config, train_dl, val_dl):
+    study = None
     study_full_path = os.path.join(config.get("StudyPath"), "study.pkl")
     is_study = os.getenv("STUDY") == "True"
 
@@ -15,7 +16,7 @@ def optimize_tft_hp(config, train_dl, val_dl):
             train_dl,
             val_dl,
             model_path=config.get("StudyPath"),
-            n_trials=100,
+            n_trials=25,
             max_epochs=20,
             gradient_clip_val_range=(0.01, 1.0),
             hidden_size_range=(8, 128),
@@ -31,8 +32,6 @@ def optimize_tft_hp(config, train_dl, val_dl):
     else:
         if os.path.isfile(study_full_path):
             study = load_pickle(study_full_path)
-        else:
-            raise ValueError
 
     return study
 
@@ -45,21 +44,36 @@ def create_tft_model(training_data: TimeSeriesDataSet, study=None):
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
             params,
-            output_size=5,
-            loss=QuantileLoss([0.1, 0.3, 0.5, 0.7, 0.9]),
+            output_size=2,
+            loss=CrossEntropy(quantiles=[0.1, 0.9]),
         )
     else:
+        # tft = TemporalFusionTransformer.from_dataset(
+        #     training_data,
+        #     # not meaningful for finding the learning rate but otherwise very important
+        #     learning_rate=0.012,
+        #     hidden_size=64,  # most important hyperparameter apart from learning rate
+        #     # number of attention heads. Set to up to 4 for large datasets
+        #     attention_head_size=3,
+        #     dropout=0.28,  # between 0.1 and 0.3 are good values
+        #     hidden_continuous_size=32,  # set to <= hidden_size
+        #     output_size=5,
+        #     loss=CrossEntropy(quantiles=[0.4, 0.6]),
+        #     # reduce learning rate if no improvement in validation loss after x epochs
+        #     reduce_on_plateau_patience=2,
+        #     log_interval=1
+        # )
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
             # not meaningful for finding the learning rate but otherwise very important
-            learning_rate=0.0001,
-            hidden_size=128,  # most important hyperparameter apart from learning rate
+            learning_rate=0.0826,
+            hidden_size=41,  # most important hyperparameter apart from learning rate
             # number of attention heads. Set to up to 4 for large datasets
-            attention_head_size=2,
-            dropout=0.1,  # between 0.1 and 0.3 are good values
-            hidden_continuous_size=16,  # set to <= hidden_size
-            output_size=5,
-            loss=QuantileLoss([0.1, 0.3, 0.5, 0.7, 0.9]),
+            attention_head_size=3,
+            dropout=0.2678,  # between 0.1 and 0.3 are good values
+            hidden_continuous_size=22,  # set to <= hidden_size
+            output_size=2,
+            loss=CrossEntropy(quantiles=[0.1, 0.9]),
             # reduce learning rate if no improvement in validation loss after x epochs
             reduce_on_plateau_patience=2,
             log_interval=1

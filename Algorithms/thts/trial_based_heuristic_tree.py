@@ -5,10 +5,10 @@ from env_thts_common import get_reward, build_next_state, EnvState, is_alertable
     get_group_lower_and_upper_bounds, get_group_state, get_group_names, get_num_iterations, \
     is_group_prediction_out_of_bound
 import time
-import plotly.graph_objects as go
 import pandas as pd
 from typing import Dict, List
 from Algorithms.render import render
+from Algorithms.statistics import init_statistics, update_statistics
 
 
 class TrialBasedHeuristicTree:
@@ -44,6 +44,8 @@ class TrialBasedHeuristicTree:
             restart_steps_history = []
 
             num_iterations = get_num_iterations(test_df, self.env.model_enc_len)
+            statistics = init_statistics(self.group_names)
+
             for iteration in range(1, num_iterations):
                 start = time.time()
                 action, run_time = self._before_transition(current_node)
@@ -75,6 +77,8 @@ class TrialBasedHeuristicTree:
                 end = time.time()
                 run_time = end - start
 
+                statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
+
                 render(self.config,
                        self.group_names,
                        test_df,
@@ -87,6 +91,7 @@ class TrialBasedHeuristicTree:
                        restart_steps_history)
 
                 current_node = DecisionNode(next_state, parent=current_node, terminal=False)
+            print(statistics)
 
     def get_initial_state(self):
         initial_state = self.env.reset()
@@ -126,7 +131,8 @@ class TrialBasedHeuristicTree:
                         and not is_terminal \
                         and group_state.steps_from_alert == self.env.max_steps_from_alert:
                     group_prediction = prediction[self.group_idx_mapping[group_name]]
-                    if self.group_prediction_exceed_bounds(group_prediction, group_name):
+                    out_of_bound, out_of_bound_idx = self.group_prediction_exceed_bounds(group_prediction, group_name)
+                    if out_of_bound:
                         action_dict[group_name] = 1
                     else:
                         action_dict[group_name] = 0
@@ -143,7 +149,8 @@ class TrialBasedHeuristicTree:
 
     def group_prediction_exceed_bounds(self, group_prediction, group_name: str):
         lb, ub = get_group_lower_and_upper_bounds(self.config, group_name)
-        return is_group_prediction_out_of_bound(group_prediction, lb, ub)
+        out_of_bound, out_of_bound_idx = is_group_prediction_out_of_bound(group_prediction, lb, ub)
+        return out_of_bound, out_of_bound_idx
 
     def _after_transition(self, next_state: EnvState, env_terminal_list: dict):
         for idx, group_state in enumerate(next_state.env_state):
