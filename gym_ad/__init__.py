@@ -1,13 +1,16 @@
 from gym.envs.registration import register
-import os
 from config import get_config
 from Models.trainer import get_model_from_checkpoint
 from utils import load_pickle
+import os
 
-config = get_config(os.getenv("DATASET"))
-model = get_model_from_checkpoint(os.getenv("CHECKPOINT"), os.getenv("MODEL_NAME"))
-val_df = load_pickle(config.get("ValDataFramePicklePath"))
-test_df = load_pickle(config.get("TestDataFramePicklePath"))
+config = get_config()
+
+model_path = os.getenv("CHECKPOINT") if os.getenv("CHECKPOINT") else config.get("load_model_path")
+model = get_model_from_checkpoint(model_path, config.get("model"))
+
+val_df = load_pickle(config.get("val_df_pkl_path"))
+test_df = load_pickle(config.get("test_df_pkl_path"))
 
 register(
     id='ad-v0',

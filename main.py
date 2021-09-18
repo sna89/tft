@@ -7,9 +7,9 @@ from evaluation import evaluate
 import warnings
 from data_utils import get_dataloader
 import os
-from data_factory import get_data_builder
-from utils import save_to_pickle
+from utils import save_to_pickle, init_base_folders , load_pickle
 from plot import plot_predictions, plot_data
+from DataBuilders.fisherman import FishermanDataBuilder
 import gym
 from Algorithms.thts.max_uct import MaxUCT
 from Algorithms.trajectory_sample.trajectory_sample import TrajectorySample
@@ -18,58 +18,80 @@ warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
 
 
-def build_data(config, dataset_name):
-    data_builder = get_data_builder(config, dataset_name)
+def build_data(config):
+    data_builder = FishermanDataBuilder(config)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds = data_builder.build_ts_data()
+
     train_dl = get_dataloader(train_ts_ds, is_train=True, config=config)
     val_dl = get_dataloader(val_ts_ds, is_train=False, config=config)
     test_dl = get_dataloader(test_ts_ds, is_train=False, config=config)
+
+    save_to_pickle(val_df, config.get("val_df_pkl_path"))
+    save_to_pickle(test_df, config.get("test_df_pkl_path"))
+
     return train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl
 
 
-def optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit=True):
-    assert model_name in ["DeepAR", "TFT"], model_name
+def optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl):
+    model_name = config.get("model")
+    if model_name not in ["TFT", "DeepAR"]:
+        raise ValueError("model must be TFT or DeepAR")
 
     study = None
+    is_study = config.get("study")
+    study_path = config.get("load_study_path")
+    if is_study or study_path:
+        if study_path and os.path.isfile(study_path):
+            study = load_pickle(study_path)
+        else:
+            if model_name == "TFT":
+                study = optimize_tft_hp(config, train_dl, val_dl)
+
+            elif model_name == "DeepAR":
+                study = optimize_deepar_hp(config, train_dl, val_dl)
+
+    is_train = config.get("train")
     model = None
+
     if model_name == "TFT":
-        study = optimize_tft_hp(config, train_dl, val_dl)
         model = create_tft_model(train_ts_ds, study)
     elif model_name == "DeepAR":
-        study = optimize_deepar_hp(config, train_dl, val_dl)
-        model = create_deepar_model(train_ts_ds, None)
+        model = create_deepar_model(train_ts_ds, study)
 
     if study:
         gradient_clip_val = study.best_params['gradient_clip_val']
     else:
-        # gradient_clip_val = 0.03
-        gradient_clip_val = 0.0106
+        gradient_clip_val = 0.01
 
-    trainer = create_trainer(gradient_clip_val)
-    if to_fit:
+    trainer = create_trainer(config, gradient_clip_val)
+    if is_train:
         trainer = fit(trainer, model, train_dl, val_dl)
-        model = get_model_from_trainer(trainer, model_name)
+        fitted_model = get_model_from_trainer(trainer, model_name)
     else:
-        model = get_model_from_checkpoint(os.getenv("CHECKPOINT"), model_name)
-    return model
+        fitted_model = get_model_from_checkpoint(config.get("load_model_path"), model_name)
+    return fitted_model
 
 
 if __name__ == '__main__':
-    dataset_name = os.getenv("DATASET")
-    model_name = os.getenv("MODEL_NAME")
-    to_fit = os.getenv("FIT") != "False"
+    init_base_folders()
+    config = get_config()
 
-    config = get_config(dataset_name)
     train_df, val_df, test_df, train_ts_ds, val_ts_ds, test_ts_ds, train_dl, val_dl, test_dl \
-        = build_data(config, dataset_name)
-    # plot_data(config, dataset_name, pd.concat([train_df, val_df, test_df], axis=0))
-    save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
-    save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
-    fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl, model_name, to_fit)
-    # ad_env = gym.make("gym_ad:ad-v0")
-    evaluate(fitted_model, test_dl)
-    plot_predictions(config, fitted_model, test_dl, test_df, dataset_name, model_name)
-    # thts = MaxUCT(ad_env, config)
-    # thts.run(test_df)
+        = build_data(config)
+
+    if config.get("plot_data"):
+        plot_data(config, pd.concat([train_df, val_df, test_df], axis=0))
+
+    fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
+    # evaluate(config, fitted_model, val_dl)
+
+    if config.get("plot_predictions"):
+        plot_predictions(config, fitted_model, val_dl, val_df)
+        plot_predictions(config, fitted_model, test_dl, test_df)
+
+    ad_env = gym.make("gym_ad:ad-v0")
+    thts = MaxUCT(fitted_model, ad_env, config)
+    thts.run(test_df)
+
     # trajectory_sample = TrajectorySample(ad_env, config, fitted_model, val_df, test_df, num_trajectories=5000)
     # trajectory_sample.run()

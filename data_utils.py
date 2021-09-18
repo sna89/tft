@@ -47,6 +47,8 @@ def add_dt_columns(data: Union[pd.DataFrame, Dict], dt_attributes: List = []):
             data['day_of_week'] = data[DATETIME_COLUMN].weekday()
         if 'month' in dt_attributes:
             data['month'] = data[DATETIME_COLUMN].month
+        if 'minute' in dt_attributes:
+            data['minute'] = data[DATETIME_COLUMN].minute
 
     return data
 
@@ -57,13 +59,13 @@ def add_log_column(data, col_name):
 
 
 def get_dataloader(ts_ds, is_train, config):
-    dataloader = ts_ds.to_dataloader(train=is_train, batch_size=config["Train"].get("BatchSize"),
-                                     num_workers=config["Train"].get("CPU"))
+    dataloader = ts_ds.to_dataloader(train=is_train, batch_size=config.get("DataLoader").get("BatchSize"),
+                                     num_workers=config.get("DataLoader").get("CPU"))
     return dataloader
 
 
 def get_group_indices_mapping(config, dl):
-    mapping = dl.dataset.decoded_index.groupby(config.get("GroupKeyword")).indices
+    mapping = dl.dataset.decoded_index.groupby(config.get("Data").get("GroupKeyword")).indices
     return mapping
 
 
@@ -71,3 +73,10 @@ def reverse_key_value_mapping(d):
     return {v: k for k, v in d.items()}
 
 
+def get_group_idx_mapping(config, model, test_df):
+    if isinstance(model.hparams.embedding_labels, dict) and \
+            config.get("Data").get("GroupKeyword") in model.hparams.embedding_labels:
+        return model.hparams.embedding_labels[config.get("Data").get("GroupKeyword")]
+    else:
+        group_name_list = list(test_df[config.get("Data").get("GroupKeyword")].unique())
+        return {group_name: group_name for group_name in group_name_list}

@@ -12,10 +12,10 @@ from Algorithms.statistics import init_statistics, update_statistics
 
 
 class TrialBasedHeuristicTree:
-    def __init__(self, env, config):
+    def __init__(self, model, env, config):
         self.env_name = "real"
         self.env = env
-        self.model = self.env.model
+        self.model = model
         self.group_idx_mapping = self.env.group_idx_mapping
         self.group_names = get_group_names(self.group_idx_mapping)
         self.num_actions = self.env.action_space.n
@@ -28,70 +28,108 @@ class TrialBasedHeuristicTree:
         self.alert_prediction_steps = self.env.max_steps_from_alert
         self.consider_trial_length = True
         self.restart_env_iterations = self.env.max_restart_steps
+        self.last_time_idx = self.env.last_time_idx
 
     def run(self, test_df):
         state = self.get_initial_state()
         initial_node = DecisionNode(state, parent=None)
 
-        for run in range(1, self.runs + 1):
-            current_node = deepcopy(initial_node)
+        current_node = deepcopy(initial_node)
 
-            action_history = []
-            reward_history = []
-            terminal_history = [{group_name: False for group_name in self.group_names}]
-            restart_history = [{group_name: False for group_name in self.group_names}]
-            alert_prediction_steps_history = []
-            restart_steps_history = []
+        anomaly_history = []
+        action_history = []
+        reward_history = []
+        terminal_history = [{group_name: False for group_name in self.group_names}]
+        restart_history = [{group_name: False for group_name in self.group_names}]
+        alert_prediction_steps_history = []
+        restart_steps_history = []
 
-            num_iterations = get_num_iterations(test_df, self.env.model_enc_len)
-            statistics = init_statistics(self.group_names)
+        num_iterations = get_num_iterations(test_df, self.env.model_enc_len)
+        statistics = init_statistics(self.group_names)
 
-            for iteration in range(1, num_iterations):
-                start = time.time()
-                action, run_time = self._before_transition(current_node)
-                action_dict = self._postprocess_action(action,
-                                                       current_node,
-                                                       terminal_history,
-                                                       restart_history,
-                                                       test_df,
-                                                       iteration)
+        for iteration in range(1, num_iterations):
+            is_anomaly = self._detect_anomalies(test_df, iteration)
 
-                next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
-                                                                                                  test_df,
-                                                                                                  iteration,
-                                                                                                  action_dict)
+            action = self._before_transition(current_node)
+            action_dict = self._postprocess_action(action,
+                                                   is_anomaly,
+                                                   current_node,
+                                                   terminal_history,
+                                                   restart_history,
+                                                   test_df,
+                                                   iteration)
 
-                next_state = self._after_transition(next_state, env_terminal_list)
+            next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
+                                                                                              test_df,
+                                                                                              iteration,
+                                                                                              action_dict,
+                                                                                              is_anomaly)
 
-                action_history.append(action_dict)
-                reward_history.append(reward)
-                terminal_history.append(env_terminal_list)
-                restart_history.append(restart_states)
-                alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
-                                                       for group_state
-                                                       in current_node.state.env_state})
-                restart_steps_history.append({group_state.series: group_state.restart_steps
-                                              for group_state
-                                              in current_node.state.env_state})
+            next_state = self._after_transition(next_state, env_terminal_list)
 
-                end = time.time()
-                run_time = end - start
+            anomaly_history.append(is_anomaly)
+            action_history.append(action_dict)
+            reward_history.append(reward)
+            terminal_history.append(env_terminal_list)
+            restart_history.append(restart_states)
+            alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
+                                                   for group_state
+                                                   in current_node.state.env_state})
+            restart_steps_history.append({group_state.series: group_state.restart_steps
+                                          for group_state
+                                          in current_node.state.env_state})
 
-                statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
+            statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
 
-                render(self.config,
-                       self.group_names,
-                       test_df,
-                       run_time,
-                       action_history,
-                       reward_history,
-                       terminal_history,
-                       restart_history,
-                       alert_prediction_steps_history,
-                       restart_steps_history)
+            render(self.config,
+                   self.group_names,
+                   test_df,
+                   action_history,
+                   anomaly_history,
+                   reward_history,
+                   terminal_history,
+                   restart_history,
+                   alert_prediction_steps_history,
+                   restart_steps_history)
 
-                current_node = DecisionNode(next_state, parent=current_node, terminal=False)
-            print(statistics)
+            current_node = DecisionNode(next_state, parent=current_node, terminal=False)
+        print(statistics)
+
+    def _detect_anomalies(self, test_df, iteration):
+        pred_len = self.config.get("Data").get("PredictionLength")
+        enc_len = self.config.get("Data").get("EncoderLength")
+        value_col = self.config.get("Data").get("ValueKeyword")
+        group_col = self.config.get("Data").get("GroupKeyword")
+
+        current_time_idx = self.last_time_idx + iteration
+        df = test_df[test_df.time_idx.isin(list(range(current_time_idx -
+                                                      pred_len -
+                                                      enc_len,
+                                                      current_time_idx)))]
+        predictions, x = self.model.predict(df, return_x=True, mode='quantiles', show_progress_bar=False)
+
+        is_anomaly_dict = dict()
+        for group in x['groups']:
+            group_name = [group_name for group_name, group_idx in self.group_idx_mapping.items() if group_idx == group.item()][0]
+
+            actuals = df[df[group_col] == group_name][value_col].values[-pred_len:]
+            prediction_lower_quantiles = predictions[group, :, 0][0]
+            prediction_upper_quantiles = predictions[group, :, -1][0]
+
+            num_anomalies = 0
+            for i in range(pred_len):
+                if actuals[i] < prediction_lower_quantiles[i].item() or actuals[i] > prediction_upper_quantiles[i].item():
+                    num_anomalies += 1
+                if actuals[i] < prediction_lower_quantiles[i].item() - 1 or actuals[i] > prediction_upper_quantiles[i].item() + 1:
+                    is_anomaly_dict[group_name] = 1
+                    break
+
+            if not group_name in is_anomaly_dict and num_anomalies >= pred_len // 2:
+                is_anomaly_dict[group_name] = 1
+            else:
+                is_anomaly_dict[group_name] = 0
+
+        return is_anomaly_dict
 
     def get_initial_state(self):
         initial_state = self.env.reset()
@@ -99,17 +137,17 @@ class TrialBasedHeuristicTree:
 
     def _before_transition(self, current_node: DecisionNode):
         action = 0
-        run_time = 0
         if not is_alertable_state(current_node, self.alert_prediction_steps, self.restart_env_iterations):
             pass
         else:
             for trial in range(self.num_trials):
                 self._run_trial(current_node)
             action = self.select_greedy_action(current_node)
-        return action, run_time
+        return action
 
     def _postprocess_action(self,
                             action: int,
+                            is_anomaly_dict: Dict,
                             current_node: DecisionNode,
                             terminal_history: List[Dict],
                             restart_history: List[Dict],
@@ -117,7 +155,7 @@ class TrialBasedHeuristicTree:
                             iteration: int
                             ) -> Dict:
         if action == 0:
-            return {group_name: action for group_name in self.group_names}
+            return {group_name: 0 for group_name in self.group_names}
         else:
             action_dict = {}
             time_idx_range = self.get_encoder_time_idx_range(test_df, iteration)
@@ -126,9 +164,11 @@ class TrialBasedHeuristicTree:
             for group_name in self.group_names:
                 is_restart = terminal_history[-1][group_name]
                 is_terminal = restart_history[-1][group_name]
+                is_anomaly = is_anomaly_dict[group_name]
                 group_state = get_group_state(current_node.state.env_state, group_name)
                 if not is_restart \
                         and not is_terminal \
+                        and not is_anomaly \
                         and group_state.steps_from_alert == self.env.max_steps_from_alert:
                     group_prediction = prediction[self.group_idx_mapping[group_name]]
                     out_of_bound, out_of_bound_idx = self.group_prediction_exceed_bounds(group_prediction, group_name)
@@ -254,12 +294,19 @@ class TrialBasedHeuristicTree:
                 return True
         return False
 
-    def _transition_real_env(self, node: DecisionNode, test_df: pd.DataFrame(), iteration: int, action_dict: Dict):
-        val_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
-        next_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + iteration)]
-        next_sample.set_index(self.config.get("GroupKeyword"), inplace=True)
-        next_state_values = next_sample[[self.config.get("ValueKeyword")]].to_dict(orient="dict")[
-            self.config.get("ValueKeyword")]
+    def _transition_real_env(self, node: DecisionNode,
+                             test_df: pd.DataFrame(),
+                             iteration: int,
+                             action_dict: Dict,
+                             is_anomaly: Dict):
+
+        next_sample_time_idx = test_df.time_idx.min() + \
+                           self.config.get("Data").get("EncoderLength") + \
+                           self.config.get("Data").get("PredictionLength")
+        next_sample = test_df[lambda x: x.time_idx == (next_sample_time_idx + iteration)]
+        next_sample.set_index(self.config.get("Data").get("GroupKeyword"), inplace=True)
+        next_state_values = next_sample[[self.config.get("Data").get("ValueKeyword")]].to_dict(orient="dict")[
+            self.config.get("Data").get("ValueKeyword")]
 
         current_state = node.state
         next_state, next_state_terminal, next_state_restart = build_next_state(self.env_name,
@@ -276,6 +323,8 @@ class TrialBasedHeuristicTree:
                             self.group_names,
                             next_state_terminal,
                             current_state,
-                            action_dict)
+                            action_dict,
+                            is_anomaly)
 
         return next_state, next_state_terminal, next_state_restart, reward
+

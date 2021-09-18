@@ -6,6 +6,7 @@ from data_utils import filter_df_by_date, add_dt_columns
 from pytorch_forecasting import TimeSeriesDataSet
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN
+from pytorch_forecasting.data import NaNLabelEncoder
 
 
 class FishermanDataBuilder(DataBuilder):
@@ -16,8 +17,8 @@ class FishermanDataBuilder(DataBuilder):
         dfs = []
         max_min_date = datetime.datetime(year=1900, month=1, day=1)
         min_max_date = datetime.datetime(year=2222, month=1, day=1)
-        for filename in os.listdir(self.config.get("Path")):
-            full_file_path = os.path.join(self.config.get("Path"), filename)
+        for filename in os.listdir(self.config.get("raw_data_path")):
+            full_file_path = os.path.join(self.config.get("raw_data_path"), filename)
             df = pd.read_csv(full_file_path, usecols=['Type', 'Value', 'Time'])
             df = df[df.Type == 'internaltemp']
             df = df.drop(columns=['Type'], axis=1)
@@ -31,7 +32,7 @@ class FishermanDataBuilder(DataBuilder):
             if max_date_df < min_max_date:
                 min_max_date = max_date_df
 
-            df[self.config.get("GroupKeyword")] = filename.replace('Sensor ', '').replace('.csv', '')
+            df[self.config.get("Data").get("GroupKeyword")] = filename.replace('Sensor ', '').replace('.csv', '')
             dfs.append(df)
 
         dfs = list(map(lambda dfx: self._preprocess_single_df_fisherman(dfx,
@@ -47,13 +48,14 @@ class FishermanDataBuilder(DataBuilder):
     def _preprocess_single_df_fisherman(self, data, min_date, max_date):
         data = filter_df_by_date(data, min_date, max_date)
         data.drop_duplicates(inplace=True)
-        sensor = data[self.config.get("GroupKeyword")].iloc[0]
-        if self.config.get("Resample") == "True":
-            data = data.set_index(DATETIME_COLUMN).resample('3H').mean()
+        sensor = data[self.config.get("Data").get("GroupKeyword")].iloc[0]
+        if self.config.get("Data").get("ResampleFreq"):
+            freq = self.config.get("Data").get("ResampleFreq")
+            data = data.set_index(DATETIME_COLUMN).resample(freq).mean()
             data[DATETIME_COLUMN] = data.index
         data.fillna(method='bfill', inplace=True)
-        data[self.config.get("GroupKeyword")] = sensor
-        data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
+        data[self.config.get("Data").get("GroupKeyword")] = sensor
+        data = add_dt_columns(data, self.config.get("Data").get("DatetimeAdditionalColumns"))
         data.reset_index(inplace=True, drop=True)
         data['time_idx'] = data.apply(lambda x: FishermanDataBuilder.set_row_time_idx(x), axis=1)
         return data
@@ -62,19 +64,19 @@ class FishermanDataBuilder(DataBuilder):
         fisherman_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
-            target=self.config.get("ValueKeyword"),
-            group_ids=[self.config.get("GroupKeyword")],
-            min_encoder_length=self.config.get("EncoderLength"),
-            max_encoder_length=self.config.get("EncoderLength"),
-            min_prediction_length=self.config.get("PredictionLength"),
-            max_prediction_length=self.config.get("PredictionLength"),
-            static_categoricals=[self.config.get("GroupKeyword")],
+            target=self.config.get("Data").get("ValueKeyword"),
+            group_ids=[self.config.get("Data").get("GroupKeyword")],
+            min_encoder_length=self.config.get("Data").get("EncoderLength"),
+            max_encoder_length=self.config.get("Data").get("EncoderLength"),
+            min_prediction_length=self.config.get("Data").get("PredictionLength"),
+            max_prediction_length=self.config.get("Data").get("PredictionLength"),
+            static_categoricals=[self.config.get("Data").get("GroupKeyword")],
             static_reals=[],
-            time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
+            time_varying_known_categoricals=self.config.get("Data").get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx"],
             time_varying_unknown_categoricals=[],
             time_varying_unknown_reals=[
-                self.config.get("ValueKeyword")
+                self.config.get("Data").get("ValueKeyword")
             ],
             # target_normalizer=GroupNormalizer(
             #     groups=["Sensor"]

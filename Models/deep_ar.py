@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from pytorch_forecasting import DeepAR
 from pytorch_forecasting.data import TimeSeriesDataSet
 import copy
-from utils import save_to_pickle, load_pickle
+from utils import save_to_pickle, STUDY_BASE_FOLDER
 
 
 def create_deepar_model(train_ts_ds, study=None):
@@ -27,7 +27,7 @@ def create_deepar_model(train_ts_ds, study=None):
             params,
             log_interval=10,
             log_val_interval=3,
-            loss=NormalDistributionLoss(quantiles=[0.1, 0.3, 0.5, 0.7, 0.9])
+            loss=NormalDistributionLoss(quantiles=[0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975])
         )
     else:
         deepar = DeepAR.from_dataset(
@@ -37,30 +37,20 @@ def create_deepar_model(train_ts_ds, study=None):
             dropout=0.057,
             log_interval=10,
             log_val_interval=3,
-            loss=NormalDistributionLoss(quantiles=[0.1, 0.3, 0.5, 0.7, 0.9])
+            loss=NormalDistributionLoss(quantiles=[0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975])
         )
     return deepar
 
 
 def optimize_deepar_hp(config, train_dl, val_dl):
-    study_full_path = os.path.join(config.get("StudyPath"), "study.pkl")
-    is_study = os.getenv("STUDY") == "True"
-
-    if is_study:
-        study = optimize_hyperparameters(
-            train_dl,
-            val_dl,
-            model_path=config.get("StudyPath"),
-            n_trials=100,
-            max_epochs=20
-        )
-        save_to_pickle(study, study_full_path)
-    else:
-        if os.path.isfile(study_full_path):
-            study = load_pickle(study_full_path)
-        else:
-            raise ValueError
-
+    study = optimize_hyperparameters(
+        train_dl,
+        val_dl,
+        model_path=STUDY_BASE_FOLDER,
+        n_trials=100,
+        max_epochs=20
+    )
+    save_to_pickle(study, config.get("save_study_path"))
     return study
 
 

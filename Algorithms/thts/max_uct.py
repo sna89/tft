@@ -3,8 +3,8 @@ from Algorithms.thts.node import DecisionNode, ChanceNode
 
 
 class MaxUCT(TrialBasedHeuristicTree):
-    def __init__(self, env, config):
-        super(MaxUCT, self).__init__(env, config)
+    def __init__(self, model, env, config):
+        super(MaxUCT, self).__init__(model, env, config)
 
     @staticmethod
     def _backup_decision_node(decision_node: DecisionNode):

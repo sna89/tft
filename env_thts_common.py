@@ -121,8 +121,14 @@ def build_next_state(env_name,
     return next_state, terminal_states, restart_states
 
 
-def get_reward(env_name, config, group_names, next_state_terminal_dict, current_state, action_dict: Dict) \
-        -> Union[Dict, float]:
+def get_reward(env_name,
+               config,
+               group_names,
+               next_state_terminal_dict,
+               current_state,
+               action_dict: Dict,
+               is_anomaly: Dict = None) -> Union[Dict, float]:
+
     assert env_name in ["simulation", "real"]
     max_steps_from_alert = config.get("Env").get("AlertMaxPredictionSteps") + 1
     min_steps_from_alert = config.get("Env").get("AlertMinPredictionSteps") + 1
@@ -132,6 +138,13 @@ def get_reward(env_name, config, group_names, next_state_terminal_dict, current_
 
     for group_name in group_names:
         reward = 0
+
+        if is_anomaly:
+            anomaly = is_anomaly[group_name]
+            if anomaly:
+                reward_group_mapping[group_name] = reward
+                continue
+
         current_group_state = get_group_state(current_state.env_state, group_name)
 
         current_state_restart = is_state_restart(current_group_state.restart_steps,
@@ -262,7 +275,7 @@ def update_steps_from_alert(current_state_restart,
 
 
 def get_group_lower_and_upper_bounds(config, group_name):
-    bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name)
+    bounds = config.get("Anomaly").get(group_name)
     lb, ub = bounds.values()
     return lb, ub
 
@@ -299,15 +312,6 @@ def is_state_restart(restart_steps, max_restart_steps):
 def get_num_iterations(test_df, enc_len):
     num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - enc_len + 3
     return num_iterations
-
-
-def get_group_idx_mapping(config, model, test_df):
-    if isinstance(model.hparams.embedding_labels, dict) and \
-            config.get("GroupKeyword") in model.hparams.embedding_labels:
-        return model.hparams.embedding_labels[config.get("GroupKeyword")]
-    else:
-        group_name_list = list(test_df[config.get("GroupKeyword")].unique())
-        return {group_name: group_name for group_name in group_name_list}
 
 
 def is_group_prediction_out_of_bound(group_prediction, lb, ub):

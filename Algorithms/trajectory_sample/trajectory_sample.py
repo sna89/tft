@@ -1,5 +1,5 @@
 import pandas as pd
-from env_thts_common import get_num_iterations, get_group_idx_mapping, get_group_names, \
+from env_thts_common import get_num_iterations, get_group_names, \
     get_group_lower_and_upper_bounds, is_group_prediction_out_of_bound, calc_reward, \
     is_state_terminal
 import os
@@ -7,6 +7,7 @@ import numpy as np
 import time
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics
+from data_utils import get_group_idx_mapping
 
 
 class TrajectorySample:

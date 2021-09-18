@@ -4,11 +4,10 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import datetime
-from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names, get_group_idx_mapping
+from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names
 import os
 from config import DATETIME_COLUMN
-from data_utils import add_dt_columns
-from data_utils import reverse_key_value_mapping
+from data_utils import add_dt_columns, reverse_key_value_mapping, get_group_idx_mapping
 from Models.trainer import get_prediction_mode
 
 
@@ -20,8 +19,8 @@ class AdEnv(gym.Env):
         self.config = config
 
         self.model = model
-        self.model_pred_len = self.config.get("PredictionLength")
-        self.model_enc_len = self.config.get("EncoderLength")
+        self.model_pred_len = self.config.get("Data").get("PredictionLength")
+        self.model_enc_len = self.config.get("Data").get("EncoderLength")
 
         self.val_df = val_df
         self.test_df = test_df
@@ -83,10 +82,10 @@ class AdEnv(gym.Env):
         self.current_state.env_state.clear()
         last_sample_df = self.val_df[self.val_df.time_idx == self.val_df.time_idx.max()]
         for idx, sample in last_sample_df.iterrows():
-            state = State(sample[self.config.get("GroupKeyword")],
+            state = State(sample[self.config.get("Data").get("GroupKeyword")],
                           self.max_steps_from_alert,
                           self.max_restart_steps,
-                          sample[self.config.get("ValueKeyword")],
+                          sample[self.config.get("Data").get("ValueKeyword")],
                           [])
             self.current_state.env_state.append(state)
         return self.current_state
@@ -107,18 +106,18 @@ class AdEnv(gym.Env):
         new_data = self._add_dummy_sample_to_data(new_data)
 
         prediction_df = pd.concat([prediction_df, pd.DataFrame.from_dict(new_data)], axis=0)
-        for dt_column in self.config.get("DatetimeAdditionalColumns"):
+        for dt_column in self.config.get("Data").get("DatetimeAdditionalColumns"):
             prediction_df[dt_column] = prediction_df[dt_column].astype(str).astype("category")
         prediction_df.reset_index(drop=True, inplace=True)
         return prediction_df
 
     def _add_sample_to_data(self, new_data, value, series, idx_diff):
-        data = {self.config.get("GroupKeyword"): series,
-                self.config.get("ValueKeyword"): value,
+        data = {self.config.get("Data").get("GroupKeyword"): series,
+                self.config.get("Data").get("ValueKeyword"): value,
                 DATETIME_COLUMN: self.last_date + datetime.timedelta(days=idx_diff),
                 'time_idx': self.last_time_idx + idx_diff
                 }
-        add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
+        add_dt_columns(data, self.config.get("Data").get("DatetimeAdditionalColumns"))
         new_data.append(data)
         return new_data
 
@@ -130,8 +129,8 @@ class AdEnv(gym.Env):
         idx_diff = len(self.current_state.env_state[0].history) + 1
 
         for sample in dummy_data:
-            series = sample[self.config.get("GroupKeyword")]
-            value = sample[self.config.get("ValueKeyword")]
+            series = sample[self.config.get("Data").get("GroupKeyword")]
+            value = sample[self.config.get("Data").get("ValueKeyword")]
             new_data = self._add_sample_to_data(new_data, value, series, idx_diff)
 
         return new_data
@@ -159,21 +158,17 @@ class AdEnv(gym.Env):
         return len(self.model.hparams.loss.quantiles)
 
     def _get_num_series(self):
-        return len(list(self.val_df[self.config.get("GroupKeyword")].unique()))
+        return len(list(self.val_df[self.config.get("Data").get("GroupKeyword")].unique()))
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()
-        mode = get_prediction_mode()
+        mode = get_prediction_mode(self.config)
         model_prediction, x = self.model.predict(prediction_df, mode=mode, return_x=True)
         if isinstance(model_prediction, dict) and "prediction" in model_prediction:
             model_prediction = model_prediction["prediction"]
         prediction = self._sample_from_prediction(model_prediction)
         idx_group_mapping = reverse_key_value_mapping(self.group_idx_mapping)
-        if os.getenv("DATASET") == "Fisherman":
-            prediction = {idx_group_mapping[idx.item()]: value for idx, value in zip(x["groups"], prediction)}
-        elif os.getenv("DATASET") == "Synthetic":
-            prediction = {idx_group_mapping[str(idx)]: value for idx, value in
-                          zip(range(self.config.get("Series")), prediction)}
+        prediction = {idx_group_mapping[idx.item()]: value for idx, value in zip(x["groups"], prediction)}
         return prediction
 
 
