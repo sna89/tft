@@ -8,30 +8,29 @@ DATETIME_COLUMN = "Date"
 def get_config():
     config = {
         "model": "TFT",
-        # "raw_data_path": "/home/sna89/pycharm_project_99/Data/Fisherman/",
-        # "save_data_path": "/home/sna89/pycharm_project_99/Data/Fisherman/processed_data.pkl",
-        "load_data_path": "/home/sna89/pycharm_project_99/Data/Fisherman/processed_data.pkl",
+        "raw_data_path": "/home/sna89/pycharm_project_99/Data/Fisherman/",
+        "save_data_path": "/home/sna89/pycharm_project_99/Pkl/processed_data.pkl",
+        # "load_data_path": "/home/sna89/pycharm_project_99/Pkl/processed_data.pkl",
         "study": False,
         # "save_study_path": "/home/sna89/pycharm_project_99/Study/study_0.pkl",
         "load_study_path": "/home/sna89/pycharm_project_99/Study/study_0.pkl",
-        "train": False,
+        "train": True,
         "load_model_path": "/home/sna89/pycharm_project_99/tb_logs/my_model/version_3/checkpoints/epoch=5-step=5279"
                            ".ckpt",
         "val_df_pkl_path": os.path.join(PKL, 'val_df.pkl'),
         "test_df_pkl_path": os.path.join(PKL, 'test_df.pkl'),
-
-        "plot_data": False,
-        "plot_predictions": False,
+        "plot_data": True,
+        "plot_predictions": True,
         "Data": {
             "EncoderLength": 56,
             "PredictionLength": 7,
             "GroupKeyword": "Sensor",
             "ValueKeyword": "Value",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
-            "ResampleFreq": "1H"
+            "ResampleFreq": ""
         },
         "DataLoader":  {
-            "BatchSize": 32,
+            "BatchSize": 256,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0

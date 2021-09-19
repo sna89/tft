@@ -7,7 +7,7 @@ from config import DATETIME_COLUMN
 
 
 def get_min_test_time_idx(config, test_df):
-    return test_df.time_idx.min() + config.get("Data").get("EncoderLength") + config.get("Data").get("PredictionLength")
+    return test_df.time_idx.min() + config.get("Data").get("EncoderLength") + config.get("Data").get("PredictionLength") - 1
 
 
 def add_group_y_value_plot(config, fig, test_df, group_name, dt_list):

@@ -12,7 +12,6 @@ from plot import plot_predictions, plot_data
 from DataBuilders.fisherman import FishermanDataBuilder
 import gym
 from Algorithms.thts.max_uct import MaxUCT
-from Algorithms.trajectory_sample.trajectory_sample import TrajectorySample
 
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
@@ -83,7 +82,7 @@ if __name__ == '__main__':
         plot_data(config, pd.concat([train_df, val_df, test_df], axis=0))
 
     fitted_model = optimize_hp_and_fit(config, train_ts_ds, train_dl, val_dl)
-    # evaluate(config, fitted_model, val_dl)
+    evaluate(config, fitted_model, val_dl)
 
     if config.get("plot_predictions"):
         plot_predictions(config, fitted_model, val_dl, val_df)
@@ -93,5 +92,3 @@ if __name__ == '__main__':
     thts = MaxUCT(fitted_model, ad_env, config)
     thts.run(test_df)
 
-    # trajectory_sample = TrajectorySample(ad_env, config, fitted_model, val_df, test_df, num_trajectories=5000)
-    # trajectory_sample.run()

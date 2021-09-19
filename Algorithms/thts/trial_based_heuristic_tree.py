@@ -117,14 +117,14 @@ class TrialBasedHeuristicTree:
             prediction_upper_quantiles = predictions[group, :, -1][0]
 
             num_anomalies = 0
-            for i in range(pred_len):
+            for i in range(pred_len - self.config.get("Env").get("RestartSteps") - 1, pred_len):
                 if actuals[i] < prediction_lower_quantiles[i].item() or actuals[i] > prediction_upper_quantiles[i].item():
                     num_anomalies += 1
-                if actuals[i] < prediction_lower_quantiles[i].item() - 1 or actuals[i] > prediction_upper_quantiles[i].item() + 1:
+                if actuals[i] < prediction_lower_quantiles[i].item() - 0.5 or actuals[i] > prediction_upper_quantiles[i].item() + 0.5:
                     is_anomaly_dict[group_name] = 1
                     break
 
-            if not group_name in is_anomaly_dict and num_anomalies >= pred_len // 2:
+            if group_name in is_anomaly_dict or num_anomalies >= pred_len // 2:
                 is_anomaly_dict[group_name] = 1
             else:
                 is_anomaly_dict[group_name] = 0
@@ -302,8 +302,8 @@ class TrialBasedHeuristicTree:
 
         next_sample_time_idx = test_df.time_idx.min() + \
                            self.config.get("Data").get("EncoderLength") + \
-                           self.config.get("Data").get("PredictionLength")
-        next_sample = test_df[lambda x: x.time_idx == (next_sample_time_idx + iteration)]
+                           self.config.get("Data").get("PredictionLength") - 1 + iteration
+        next_sample = test_df[lambda x: x.time_idx == next_sample_time_idx]
         next_sample.set_index(self.config.get("Data").get("GroupKeyword"), inplace=True)
         next_state_values = next_sample[[self.config.get("Data").get("ValueKeyword")]].to_dict(orient="dict")[
             self.config.get("Data").get("ValueKeyword")]
