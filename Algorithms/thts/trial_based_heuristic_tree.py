@@ -2,13 +2,13 @@ from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 from utils import get_argmax_from_list, set_env_to_state
 from env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
-    get_group_lower_and_upper_bounds, get_group_state, get_group_names, get_num_iterations, \
-    is_group_prediction_out_of_bound
+    get_group_state, get_group_names, get_num_iterations
 import time
 import pandas as pd
 from typing import Dict, List
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics
+from data_utils import get_group_lower_and_upper_bounds, is_group_prediction_out_of_bound
 
 
 class TrialBasedHeuristicTree:

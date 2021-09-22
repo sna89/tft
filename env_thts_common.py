@@ -2,8 +2,7 @@ from typing import List, Dict, Union
 from dataclasses import dataclass, field
 from torch import Tensor
 from Algorithms.thts.node import DecisionNode
-import os
-import torch
+from data_utils import get_group_lower_and_upper_bounds
 
 
 @dataclass
@@ -261,12 +260,6 @@ def update_steps_from_alert(current_state_restart,
     return steps_from_alert
 
 
-def get_group_lower_and_upper_bounds(config, group_name):
-    bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name)
-    lb, ub = bounds.values()
-    return lb, ub
-
-
 def is_state_terminal(config, group_name, value, current_state_restart=None):
     if not current_state_restart:
         lb, ub = get_group_lower_and_upper_bounds(config, group_name)
@@ -299,21 +292,3 @@ def is_state_restart(restart_steps, max_restart_steps):
 def get_num_iterations(test_df, enc_len):
     num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - enc_len + 3
     return num_iterations
-
-
-def get_group_idx_mapping(config, model, test_df):
-    if isinstance(model.hparams.embedding_labels, dict) and \
-            config.get("GroupKeyword") in model.hparams.embedding_labels:
-        return model.hparams.embedding_labels[config.get("GroupKeyword")]
-    else:
-        group_name_list = list(test_df[config.get("GroupKeyword")].unique())
-        return {group_name: group_name for group_name in group_name_list}
-
-
-def is_group_prediction_out_of_bound(group_prediction, lb, ub):
-    out_of_bound = torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)
-    if sum(out_of_bound) > 0:
-        idx = (out_of_bound == 1).nonzero()[0].item()
-        return True, idx
-    else:
-        return False, -1

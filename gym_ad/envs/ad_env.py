@@ -4,11 +4,10 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import datetime
-from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names, get_group_idx_mapping
+from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names
 import os
 from config import DATETIME_COLUMN
-from data_utils import add_dt_columns
-from data_utils import reverse_key_value_mapping
+from data_utils import add_dt_columns, reverse_key_value_mapping, get_group_idx_mapping
 from Models.trainer import get_prediction_mode
 
 

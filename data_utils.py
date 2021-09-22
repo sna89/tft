@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from config import DATETIME_COLUMN
 from typing import List, Union, Dict
+import os
+import torch
 
 
 def filter_df_by_date(df, min_date=None, max_date=None):
@@ -71,3 +73,46 @@ def reverse_key_value_mapping(d):
     return {v: k for k, v in d.items()}
 
 
+def assign_time_idx(df, dt_col):
+    dt_data = pd.to_datetime(pd.unique(df[dt_col].sort_values()))
+    dt_time_idx_mapping = dict(zip(pd.to_datetime(dt_data), list(range(1, len(dt_data) + 1))))
+    df['time_idx'] = [dt_time_idx_mapping[pd.to_datetime(dt)] for dt in df[dt_col]]
+    return df
+
+
+def get_group_lower_and_upper_bounds(config, group_name):
+    bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name)
+    lb, ub = bounds.values()
+    return lb, ub
+
+
+def add_future_exceed(config, data, group):
+    prediction_len = config.get("PredictionLength")
+    lb, ub = get_group_lower_and_upper_bounds(config, group)
+    exception_col = config.get("ExceptionKeyword")
+    data[exception_col] = is_future_exceed(config, data, prediction_len, lb, ub)
+    data[exception_col] = data[exception_col].astype(int).astype(str).astype("category")
+    return data
+
+
+def is_future_exceed(config, data, prediction_len, lb, ub):
+    shifted_values = data.shift(-prediction_len)[config.get("ValueKeyword")]
+    return (shifted_values < lb) | (shifted_values > ub)
+
+
+def get_group_idx_mapping(config, model, df):
+    if isinstance(model.hparams.embedding_labels, dict) and \
+            config.get("GroupKeyword") in model.hparams.embedding_labels:
+        return model.hparams.embedding_labels[config.get("GroupKeyword")]
+    else:
+        group_name_list = list(df[config.get("GroupKeyword")].unique())
+        return {group_name: group_name for group_name in group_name_list}
+
+
+def is_group_prediction_out_of_bound(group_prediction, lb, ub):
+    out_of_bound = torch.where((group_prediction < lb) | (group_prediction > ub), 1, 0)
+    if sum(out_of_bound) > 0:
+        idx = (out_of_bound == 1).nonzero()[0].item()
+        return True, idx
+    else:
+        return False, -1

@@ -60,6 +60,7 @@ def get_config(dataset_name):
             "PredictionLength": 7,
             "GroupKeyword": "Sensor",
             "ValueKeyword": "Value",
+            "ExceptionKeyword": "future_exceed",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "Resample": "False"
         },
@@ -93,14 +94,14 @@ def get_config(dataset_name):
             "GroupColumns": ['PartId', 'OrderStepId', 'QmpId'],
             "ValueKeyword": "ActualValue",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute', 'second'],
-            "EncoderLength": 240,
-            "PredictionLength": 10,
+            "EncoderLength": 180,
+            "PredictionLength": 30,
         }
     }
 
     train_config = {
         "Train": {
-            "BatchSize": 128,
+            "BatchSize": 32,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0
@@ -129,10 +130,10 @@ def get_config(dataset_name):
                         "lb": -22,
                         "hb": -8,
                     },
-                    # "U100314": {
-                    #     "lb": -20,
-                    #     "hb": 22,
-                    # },
+                    "U100314": {
+                        "lb": -20,
+                        "hb": 22,
+                    },
                     "U100329": {
                         "lb": 0,
                         "hb": 11,
@@ -141,14 +142,14 @@ def get_config(dataset_name):
                         "lb": -2,
                         "hb": 11,
                     },
-                    # "U106724": {
-                    #     "lb": -1,
-                    #     "hb": 6,
-                    # },
-                    # "U100312": {
-                    #     "lb": 0,
-                    #     "hb": 4.5,
-                    # },
+                    "U106724": {
+                        "lb": -1,
+                        "hb": 6,
+                    },
+                    "U100312": {
+                        "lb": 0,
+                        "hb": 4.5,
+                    },
                     "U100309": {
                         "lb": -5,
                         "hb": 12,
@@ -157,10 +158,10 @@ def get_config(dataset_name):
                         "lb": 4,
                         "hb": 17,
                     },
-                    # "U106755": {
-                    #     "lb": 13,
-                    #     "hb": 28,
-                    # },
+                    "U106755": {
+                        "lb": 13,
+                        "hb": 28,
+                    },
                 }
 
             },

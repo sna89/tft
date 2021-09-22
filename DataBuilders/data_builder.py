@@ -5,7 +5,6 @@ import os
 import pandas as pd
 import numpy as np
 from config import DATETIME_COLUMN
-from datetime import timedelta
 
 
 class DataBuilder(ABC):
@@ -16,19 +15,24 @@ class DataBuilder(ABC):
         self.enc_length = config.get("EncoderLength")
         self.prediction_length = config.get("PredictionLength")
 
-    def build_ts_data(self):
-        # if self.config.get("ProcessedDataPath") and os.path.isfile(self.config.get("ProcessedDataPath")):
-        #     data = load_pickle(self.config.get("ProcessedDataPath"))
-        # else:
-        data = self.get_data()
-        data = self.preprocess(data)
+    def build_data(self) -> pd.DataFrame():
+        if self.config.get("ProcessedDataPath") and os.path.isfile(self.config.get("ProcessedDataPath")):
+            data = load_pickle(self.config.get("ProcessedDataPath"))
+        else:
+            data = self.get_data()
+            data = self.preprocess(data)
+        return data
 
-        train_df, validation_df, test_df = self.split_dataframe_train_val_test(data)
-        train_ts_ds = self.define_ts_ds(train_df)
-        parameters = train_ts_ds.get_parameters()
-        validation_ts_ds = TimeSeriesDataSet.from_parameters(parameters, validation_df)
-        test_ts_ds = TimeSeriesDataSet.from_parameters(parameters, test_df)
-        return train_df, validation_df, test_df, train_ts_ds, validation_ts_ds, test_ts_ds
+    def build_ts_data(self, df: pd.DataFrame(), parameters=None):
+        if not parameters:
+            ts_ds = self.define_ts_ds(df)
+            parameters = ts_ds.get_parameters()
+        else:
+            ts_ds = TimeSeriesDataSet.from_parameters(parameters, df)
+        return ts_ds, parameters
+
+    def build_exception_ts_data(self, data):
+        pass
 
     def get_data(self):
         raise NotImplementedError
@@ -45,7 +49,7 @@ class DataBuilder(ABC):
     def define_ts_ds(train_df):
         raise NotImplementedError
 
-    def split_dataframe_train_val_test(self, data, by=DATETIME_COLUMN, method="random"):
+    def split_df(self, data: pd.DataFrame(), by: str = DATETIME_COLUMN, method: str = "random"):
         assert by in ["time_idx", DATETIME_COLUMN], "by parameter in split_dataframe_train_val_test must be either: " \
                                                     "time_idx, {}".format(DATETIME_COLUMN)
         assert method in ["ratio", "random"], "method parameter in split_dataframe_train_val_test must be either: " \
@@ -82,12 +86,13 @@ class DataBuilder(ABC):
             groups = pd.unique(data[self.config.get("GroupKeyword")])
             for i, group in enumerate(groups):
                 sub_df = data[data[self.config.get("GroupKeyword")] == group]
-                max_time_idx = sub_df.time_idx.max()
-                if max_time_idx <= encoder_len + prediction_len:
+                time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
+                if time_idx_delta <= encoder_len + prediction_len:
                     continue
 
-                random_time_idx_list = list(np.random.choice(np.arange(encoder_len, max_time_idx - prediction_len),
-                                                             size=(10, 3)))
+                random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
+                                                                       sub_df.time_idx.max() - prediction_len),
+                                                             size=(5, 2)))
                 for time_idx in random_time_idx_list:
                     train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
                                           & (sub_df.time_idx <= time_idx[0] + prediction_len)]
@@ -100,14 +105,14 @@ class DataBuilder(ABC):
             train_df = pd.concat(train_df_list, axis=0)
             val_df = pd.concat(val_df_list, axis=0)
 
-        train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
-            sort_values('time_idx').\
-            reset_index(drop=True)
-        val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
-            sort_values('time_idx').\
-            reset_index(drop=True)
-        test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
-            sort_values('time_idx').\
-            reset_index(drop=True)
+            train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
+                sort_values('time_idx').\
+                reset_index(drop=True)
+            val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
+                sort_values('time_idx').\
+                reset_index(drop=True)
+            test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']).\
+                sort_values('time_idx').\
+                reset_index(drop=True)
 
         return train_df, val_df, test_df

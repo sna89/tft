@@ -3,7 +3,7 @@ from datetime import timedelta
 import numpy as np
 import os
 import pandas as pd
-from data_utils import add_dt_columns
+from data_utils import add_dt_columns, assign_time_idx
 from pytorch_forecasting import TimeSeriesDataSet
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN
@@ -38,12 +38,12 @@ class StrausDataBuilder(DataBuilder):
             qmp_order_log_df[group_col] = qmp_order_log_df[group_col].astype(str).astype("category")
         # self._get_bounds(filename, data)
         qmp_order_log_df.drop_duplicates(subset=["QmpId", "PartId", "OrderStepId", 'TimeStmp'], inplace=True)
+        qmp_order_log_df = assign_time_idx(qmp_order_log_df, "TimeStmp")
         return qmp_order_log_df
 
     def preprocess(self, data):
         data = self._add_dt_column(data)
         data = self._sort_data(data)
-        data = self._assign_time_idx(data)
         data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
         data.sort_values(by=[KEY_COLUMN, DATETIME_COLUMN], ascending=True, inplace=True)
         data.reset_index(drop=True, inplace=True)
@@ -178,9 +178,12 @@ class StrausDataBuilder(DataBuilder):
                                                                            how='right',
                                                                            lsuffix='_caller',
                                                                            rsuffix='_other')
+        qmp_order_log_joined_df.dropna(inplace=True)
         qmp_order_log_joined_df.drop(columns=["ActualStrTime", "ActualEndTime", "ActualQty"], inplace=True)
         qmp_order_log_joined_df['OrderStepId'] = qmp_order_log_joined_df.index
-        qmp_order_log_joined_df.dropna(inplace=True)
+        qmp_order_log_joined_df = qmp_order_log_joined_df.astype({'OrderStepId': 'int32',
+                                                                  "QmpId": "int32",
+                                                                  "PartId": "int32"})
         qmp_order_log_joined_df.sort_values(by="TimeStmp", inplace=True)
         qmp_order_log_joined_df.reset_index(drop=True, inplace=True)
         return qmp_order_log_joined_df
@@ -254,7 +257,7 @@ class StrausDataBuilder(DataBuilder):
                             print(bound_parameter)
                             print(unique_arr)
 
-    def _assign_time_idx(self, df):
+    def _assign_time_idx_per_group(self, df):
         df['time_idx'] = None
         keys = pd.unique(df[KEY_COLUMN])
         for key in keys:
@@ -263,11 +266,6 @@ class StrausDataBuilder(DataBuilder):
             time_index_time_idx_mapping = dict(zip(pd.to_datetime(time_index), list(range(1, len(time_index) + 1))))
             df.loc[sub_df.index, 'time_idx'] = sub_df.apply(lambda x: self._get_time_idx(x, time_index_time_idx_mapping), axis=1)
         return df
-
-    @staticmethod
-    def _get_time_idx(row, time_index_time_idx_mapping):
-        time_idx = time_index_time_idx_mapping[pd.to_datetime(row[DATETIME_COLUMN])]
-        return time_idx
 
     @staticmethod
     def get_key_sub_df(data, key):

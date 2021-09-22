@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from pytorch_forecasting import DeepAR
 from pytorch_forecasting.data import TimeSeriesDataSet
 import copy
-from utils import save_to_pickle, load_pickle
+from utils import save_to_pickle
 
 
 def create_deepar_model(train_ts_ds, study=None):
@@ -42,25 +42,15 @@ def create_deepar_model(train_ts_ds, study=None):
     return deepar
 
 
-def optimize_deepar_hp(config, train_dl, val_dl):
-    study_full_path = os.path.join(config.get("StudyPath"), "study.pkl")
-    is_study = os.getenv("STUDY") == "True"
-
-    if is_study:
-        study = optimize_hyperparameters(
-            train_dl,
-            val_dl,
-            model_path=config.get("StudyPath"),
-            n_trials=100,
-            max_epochs=20
-        )
-        save_to_pickle(study, study_full_path)
-    else:
-        if os.path.isfile(study_full_path):
-            study = load_pickle(study_full_path)
-        else:
-            raise ValueError
-
+def optimize_deepar_hp(config, train_dl, val_dl, path):
+    study = optimize_hyperparameters(
+        train_dl,
+        val_dl,
+        model_path=config.get("StudyPath"),
+        n_trials=100,
+        max_epochs=20
+    )
+    save_to_pickle(study, path)
     return study
 
 

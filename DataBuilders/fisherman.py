@@ -2,7 +2,7 @@ import datetime
 from datetime import timedelta
 import os
 import pandas as pd
-from data_utils import filter_df_by_date, add_dt_columns
+from data_utils import filter_df_by_date, add_dt_columns, assign_time_idx, add_future_exceed
 from pytorch_forecasting import TimeSeriesDataSet
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN
@@ -41,6 +41,7 @@ class FishermanDataBuilder(DataBuilder):
                        dfs)
                    )
         data = pd.concat(dfs, axis=0)
+        data = assign_time_idx(data, DATETIME_COLUMN)
         data.reset_index(inplace=True, drop=True)
         return data
 
@@ -55,12 +56,12 @@ class FishermanDataBuilder(DataBuilder):
         data[self.config.get("GroupKeyword")] = sensor
         data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
         data.reset_index(inplace=True, drop=True)
-        data['time_idx'] = data.apply(lambda x: FishermanDataBuilder.set_row_time_idx(x), axis=1)
+        data = add_future_exceed(self.config, data, sensor)
         return data
 
-    def define_ts_ds(self, train_df):
-        fisherman_train_ts_ds = TimeSeriesDataSet(
-            train_df,
+    def define_ts_ds(self, df):
+        fisherman_ts_ds = TimeSeriesDataSet(
+            df,
             time_idx="time_idx",
             target=self.config.get("ValueKeyword"),
             group_ids=[self.config.get("GroupKeyword")],
@@ -76,17 +77,35 @@ class FishermanDataBuilder(DataBuilder):
             time_varying_unknown_reals=[
                 self.config.get("ValueKeyword")
             ],
-            # target_normalizer=GroupNormalizer(
-            #     groups=["Sensor"]
-            # ),
             add_relative_time_idx=True,
             add_target_scales=True,
             add_encoder_length=False,
             allow_missings=True
         )
-        return fisherman_train_ts_ds
+        return fisherman_ts_ds
 
-    @staticmethod
-    def set_row_time_idx(x):
-        time_idx = x.name
-        return time_idx
+    def define_exception_ts_ds(self, train_exception_df):
+        fisherman_train_exception_ts_ds = TimeSeriesDataSet(
+            train_exception_df,
+            time_idx="time_idx",
+            target=self.config.get("ExceptionKeyword"),
+            group_ids=[self.config.get("GroupKeyword")],
+            min_encoder_length=self.config.get("EncoderLength"),
+            max_encoder_length=self.config.get("EncoderLength"),
+            min_prediction_length=self.config.get("PredictionLength"),
+            max_prediction_length=self.config.get("PredictionLength"),
+            static_categoricals=[self.config.get("GroupKeyword")],
+            static_reals=[],
+            time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
+            time_varying_known_reals=["time_idx"],
+            time_varying_unknown_categoricals=[self.config.get("ExceptionKeyword")],
+            time_varying_unknown_reals=[
+                self.config.get("ValueKeyword")
+            ],
+            add_relative_time_idx=True,
+            add_target_scales=True,
+            add_encoder_length=False,
+            allow_missings=True
+        )
+        return fisherman_train_exception_ts_ds
+
