@@ -5,11 +5,11 @@ from pytorch_forecasting import TimeSeriesDataSet
 from utils import save_to_pickle
 
 
-def optimize_tft_hp(config, train_dl, val_dl, path):
+def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path):
     study = optimize_hyperparameters(
         train_dl,
         val_dl,
-        model_path=config.get("StudyPath"),
+        model_path=study_path,
         n_trials=25,
         max_epochs=20,
         gradient_clip_val_range=(0.01, 1.0),
@@ -22,11 +22,14 @@ def optimize_tft_hp(config, train_dl, val_dl, path):
         reduce_on_plateau_patience=4,
         use_learning_rate_finder=False,
     )
-    save_to_pickle(study, path)
+    save_to_pickle(study, study_pkl_path)
     return study
 
 
 def create_tft_model(training_data: TimeSeriesDataSet, study=None):
+    loss = QuantileLoss([0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975])
+    output_size = 7
+
     if study:
         params = study.best_params
         del params['gradient_clip_val']
@@ -34,30 +37,25 @@ def create_tft_model(training_data: TimeSeriesDataSet, study=None):
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
             params,
-            output_size=7,
-            loss=QuantileLoss([0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975]),
+            hidden_size=params['hidden_size'],
+            output_size=output_size,
+            loss=loss,
         )
+
     else:
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
             # not meaningful for finding the learning rate but otherwise very important
-            learning_rate=0.0826,
-            hidden_size=128,  # most important hyperparameter apart from learning rate
+            learning_rate=0.0544,
+            hidden_size=64,  # most important hyperparameter apart from learning rate
             # number of attention heads. Set to up to 4 for large datasets
-            attention_head_size=3,
-            dropout=0.2678,  # between 0.1 and 0.3 are good values
-            hidden_continuous_size=22,  # set to <= hidden_size
-            output_size=2,
-            loss=QuantileLoss([0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975]),
+            attention_head_size=2,
+            dropout=0.194,  # between 0.1 and 0.3 are good values
+            hidden_continuous_size=10,  # set to <= hidden_size
+            output_size=output_size,
+            loss=loss,
             # reduce learning rate if no improvement in validation loss after x epochs
             reduce_on_plateau_patience=2,
             log_interval=1
         )
     return tft
-
-
-
-
-
-
-

@@ -2,65 +2,99 @@ import os
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_forecasting.models.temporal_fusion_transformer import TemporalFusionTransformer
-from pytorch_forecasting.models.deepar import DeepAR
 from Models.tft import create_tft_model, optimize_tft_hp
 from Models.deep_ar import create_deepar_model, optimize_deepar_hp
 from Models.fc import FullyConnectedModel
 from data_utils import get_dataloader
 from utils import load_pickle
+from utils import get_model_from_checkpoint, get_model_from_trainer
+from Loss.weighted_cross_entropy import WeightedCrossEntropy
 
 
-def fit_classification_model(config, fitted_model, train_dl, val_dl):
-    hidden_size = config.get("HiddenSize")
-    fc_model = FullyConnectedModel(fitted_model=fitted_model,
-                                   input_size=hidden_size,
-                                   output_size=2,
-                                   n_hidden_layers=2,
-                                   hidden_size=hidden_size//4)
-    trainer = create_trainer(gradient_clip_val=0.01)
-    trainer = fit(trainer, fc_model, train_dl, val_dl)
-    classification_model = get_model_from_trainer(trainer, "Classification")
-    return classification_model
+def create_classification_model(reg_study, weights=None):
+    input_size = reg_study.best_params['hidden_size'] if reg_study and 'hidden_size' in reg_study.best_params else 64
+
+    fc = FullyConnectedModel(input_size=input_size,
+                             hidden_size=input_size // 2,
+                             output_size=1,
+                             n_hidden_layers=3,
+                             n_classes=2,
+                             dropout=0.25,
+                             loss=WeightedCrossEntropy(weights),
+                             learning_rate=0.0001)
+    return fc
 
 
-def optimize_hp(config, train_ts_ds, val_ts_ds, model_name):
+def fit_classification_model(config, classification_model, train_ts_ds, val_ts_ds):
+    classification_checkpoint = os.getenv("CHECKPOINT_CLASS")
+    to_fit = os.getenv("FIT_CLASS") == "True"
+
+    if to_fit:
+        train_dl = get_dataloader(train_ts_ds, True, config)
+        val_dl = get_dataloader(val_ts_ds, False, config)
+
+        trainer = create_trainer(gradient_clip_val=0.01)
+        trainer = fit(trainer, classification_model, train_dl, val_dl)
+        fitted_classification_model = get_model_from_trainer(trainer, "Classification")
+
+    elif classification_checkpoint and os.path.isfile(classification_checkpoint):
+        fitted_classification_model = get_model_from_checkpoint(classification_checkpoint, "Classification")
+    else:
+        raise ValueError
+
+    return fitted_classification_model
+
+
+def optimize_hp(config, train_ds, val_ds, model_name, type_='reg'):
     study = None
 
-    train_dl = get_dataloader(train_ts_ds, is_train=True, config=config)
-    val_dl = get_dataloader(val_ts_ds, is_train=False, config=config)
+    train_dl = get_dataloader(train_ds, is_train=True, config=config)
+    val_dl = get_dataloader(val_ds, is_train=False, config=config)
 
-    study_path = os.path.join(config.get("StudyPath"), "study.pkl")
-    if os.path.isfile(study_path) and os.getenv("STUDY") == "False":
-        study = load_pickle(study_path)
+    if type_ == "reg":
+        study_pkl_path = os.path.join(config.get("StudyRegPath"), "study.pkl")
+        if os.path.isfile(study_pkl_path) and os.getenv("STUDY_REG") == "False":
+            return load_pickle(study_pkl_path)
+
+    elif type_ == "class":
+        study_pkl_path = os.path.join(config.get("StudyClassPath"), "study.pkl")
+        if os.path.isfile(study_pkl_path) and os.getenv("STUDY_CLASS") == "False":
+            return load_pickle(study_pkl_path)
 
     else:
-        if os.getenv("STUDY") == "True":
-            if model_name == "TFT":
-                study = optimize_tft_hp(config, train_dl, val_dl, study_path)
-            elif model_name == "DeepAR":
-                study = optimize_deepar_hp(config, train_dl, val_dl, study_path)
+        raise ValueError
+
+    if os.getenv("STUDY_REG") == "True" and type_ == "reg":
+        study_path = config.get("StudyRegPath")
+
+        if model_name == "TFT":
+            study = optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path)
+        elif model_name == "DeepAR":
+            study = optimize_deepar_hp(train_dl, val_dl, study_pkl_path, study_path)
 
     return study
 
 
-def fit_regression(config, train_ts_ds, val_ts_ds, model_name, study=None):
+def fit_regression_model(config, train_ds, val_ds, model_name, study=None, type_="reg"):
     model = None
     if model_name == "TFT":
-        model = create_tft_model(train_ts_ds, study)
+        model = create_tft_model(train_ds, study)
     elif model_name == "DeepAR":
-        model = create_deepar_model(train_ts_ds, None)
+        model = create_deepar_model(train_ds, None)
 
     trainer = create_trainer(study)
 
-    if os.getenv("FIT") != "False":
-        train_dl = get_dataloader(train_ts_ds, is_train=True, config=config)
-        val_dl = get_dataloader(val_ts_ds, is_train=False, config=config)
+    to_fit = os.getenv("FIT_{}".format(type_.upper()))
+    if to_fit == "True":
+        train_dl = get_dataloader(train_ds, is_train=True, config=config)
+        val_dl = get_dataloader(val_ds, is_train=False, config=config)
         trainer = fit(trainer, model, train_dl, val_dl)
         model = get_model_from_trainer(trainer, model_name)
-    else:
-        checkpoint = os.getenv("CHECKPOINT")
+    elif to_fit == "False":
+        checkpoint = os.getenv("CHECKPOINT_{}".format(type_.upper()))
         model = get_model_from_checkpoint(checkpoint, model_name)
+    else:
+        raise ValueError
 
     return model
 
@@ -95,27 +129,9 @@ def fit(trainer, model, train_dl, val_dl):
     return trainer
 
 
-def get_model_from_trainer(trainer, model_name):
-    best_model_path = trainer.checkpoint_callback.best_model_path
-    os.environ["CHECKPOINT"] = best_model_path
-    best_tft = get_model_from_checkpoint(best_model_path, model_name)
-    return best_tft
-
-
-def get_model_from_checkpoint(checkpoint, model_name):
-    best_model = None
-    if model_name == "TFT":
-        best_model = TemporalFusionTransformer.load_from_checkpoint(checkpoint)
-    elif model_name == "DeepAR":
-        best_model = DeepAR.load_from_checkpoint(checkpoint)
-    elif model_name == "Classification":
-        best_model = FullyConnectedModel.load_from_checkpoint(checkpoint)
-    return best_model
-
-
 def get_prediction_mode():
     model_name = os.getenv("MODEL_NAME")
-    if model_name == "TFT" :
+    if model_name == "TFT":
         mode = "raw"
     elif model_name == "DeepAR":
         mode = "quantiles"

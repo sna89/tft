@@ -16,7 +16,8 @@ def get_actuals(dl):
 def evaluate_regression(config, df, ts_ds, model):
     dl = get_dataloader(ts_ds, False, config)
     actuals = get_actuals(dl)
-    predictions, x = model.predict(dl, return_x=True, show_progress_bar=True)
+    predictions, x = model.predict(dl, mode="prediction", return_x=True, show_progress_bar=True)
+    print()
 
     group_idx_mapping = get_group_idx_mapping(config, model, df)
     for group, idx in group_idx_mapping.items():

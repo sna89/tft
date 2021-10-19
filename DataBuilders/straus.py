@@ -275,11 +275,11 @@ class StrausDataBuilder(DataBuilder):
                           (data.QmpId == qmp_id)]
         return key_sub_df
 
-    def define_ts_ds(self, train_df):
+    def define_regression_ts_ds(self, train_df):
         straus_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
-            target="is_stoppage",
+            target=self.config.get("ValueKeyword"),
             group_ids=[self.config.get("GroupKeyword")],
             min_encoder_length=self.config.get("EncoderLength"),
             max_encoder_length=self.config.get("EncoderLength"),
@@ -289,16 +289,91 @@ class StrausDataBuilder(DataBuilder):
             static_reals=[],
             time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx", "TargetValue"],
-            time_varying_unknown_categoricals=[],
+            time_varying_unknown_categoricals=[self.config.get("ExceptionKeyword")],
             time_varying_unknown_reals=[
                 self.config.get("ValueKeyword")
             ],
             add_relative_time_idx=True,
-            add_target_scales=True,
             add_encoder_length=False,
-            allow_missings=True,
+            allow_missing_timesteps=True,
             categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True),
                                   **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in
                                      self.config.get("DatetimeAdditionalColumns")}},
         )
         return straus_train_ts_ds
+
+    def define_classification_ts_ds(self, train_df):
+        straus_train_ts_ds = TimeSeriesDataSet(
+            train_df,
+            time_idx="time_idx",
+            target=self.config.get("ExceptionKeyword"),
+            group_ids=[self.config.get("GroupKeyword")],
+            min_encoder_length=self.config.get("EncoderLength"),
+            max_encoder_length=self.config.get("EncoderLength"),
+            min_prediction_length=self.config.get("PredictionLength"),
+            max_prediction_length=self.config.get("PredictionLength"),
+            static_categoricals=[self.config.get("GroupKeyword")],
+            static_reals=[],
+            time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
+            time_varying_known_reals=["time_idx", "TargetValue"],
+            time_varying_unknown_categoricals=[self.config.get("ExceptionKeyword")],
+            time_varying_unknown_reals=[
+                self.config.get("ValueKeyword")
+            ],
+            add_relative_time_idx=True,
+            add_encoder_length=False,
+            allow_missing_timesteps=True,
+            categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True),
+                                  **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in
+                                     self.config.get("DatetimeAdditionalColumns")}},
+        )
+        return straus_train_ts_ds
+
+    def split_df(self, data: pd.DataFrame()):
+        np.random.seed(42)
+
+        train_df_list = []
+        val_df_list = []
+
+        date_index = pd.DatetimeIndex(data[DATETIME_COLUMN])
+        date_index_total_time = date_index.max() - date_index.min()
+        test_time_start_dt = date_index.min() + date_index_total_time * (self.train_ratio + self.val_ratio)
+
+        test_df = data[lambda x: x[DATETIME_COLUMN] >= test_time_start_dt]
+        data = data[lambda x: x[DATETIME_COLUMN] < test_time_start_dt]
+
+        encoder_len = self.config.get("EncoderLength")
+        prediction_len = self.config.get("PredictionLength")
+        groups = pd.unique(data[self.config.get("GroupKeyword")])
+        for i, group in enumerate(groups):
+            sub_df = data[data[self.config.get("GroupKeyword")] == group]
+            time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
+            if time_idx_delta <= encoder_len + prediction_len:
+                continue
+
+            random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
+                                                                   sub_df.time_idx.max() - prediction_len),
+                                                         size=(5, 2)))
+            for time_idx in random_time_idx_list:
+                train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
+                                      & (sub_df.time_idx <= time_idx[0] + prediction_len)]
+                val_sub_df = sub_df[(sub_df.time_idx >= time_idx[1] - encoder_len)
+                                    & (sub_df.time_idx <= time_idx[1] + prediction_len)]
+
+                train_df_list.append(train_sub_df)
+                val_df_list.append(val_sub_df)
+
+        train_df = pd.concat(train_df_list, axis=0)
+        val_df = pd.concat(val_df_list, axis=0)
+
+        train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+        val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+        test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+
+        return train_df, val_df, test_df

@@ -53,7 +53,7 @@ class StallionDataBuilder(DataBuilder):
         add_log_column(data, 'soda_volume')
         return data
 
-    def define_ts_ds(self, train_df):
+    def define_regression_ts_ds(self, train_df):
         special_days = StallionDataBuilder.get_special_days()
         stallion_train_ts_ds = TimeSeriesDataSet(
             train_df,

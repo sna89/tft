@@ -4,17 +4,19 @@ from config import DATETIME_COLUMN
 from typing import List, Union, Dict
 import os
 import torch
+from datetime import timedelta
+import time
 
 
 def filter_df_by_date(df, min_date=None, max_date=None):
     if min_date is None and max_date is None:
         raise ValueError
     elif min_date and max_date is None:
-        return df[df[DATETIME_COLUMN] >= min_date]
+        return df[df[DATETIME_COLUMN] > min_date]
     elif min_date is None and max_date:
-        return df[df[DATETIME_COLUMN] <= max_date]
+        return df[df[DATETIME_COLUMN] < max_date]
     else:
-        return df[(min_date <= df[DATETIME_COLUMN]) & (df[DATETIME_COLUMN] <= max_date)]
+        return df[(min_date < df[DATETIME_COLUMN]) & (df[DATETIME_COLUMN] < max_date)]
 
 
 def add_dt_columns(data: Union[pd.DataFrame, Dict], dt_attributes: List = []):
@@ -116,3 +118,13 @@ def is_group_prediction_out_of_bound(group_prediction, lb, ub):
         return True, idx
     else:
         return False, -1
+
+
+def get_label_weights(df, labels, label_keyword):
+    weights = []
+    for label in labels:
+        label_count = df[df[label_keyword] == label].shape[0]
+        weights.append(label_count)
+    max_weight = max(weights)
+    weights = [max_weight / weight for weight in weights]
+    return weights

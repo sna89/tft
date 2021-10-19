@@ -1,4 +1,4 @@
-from pytorch_forecasting.metrics import NormalDistributionLoss
+from pytorch_forecasting.metrics import NormalDistributionLoss, NegativeBinomialDistributionLoss
 import logging
 import os
 from typing import Any, Dict, Tuple, Union
@@ -18,6 +18,8 @@ from utils import save_to_pickle
 
 
 def create_deepar_model(train_ts_ds, study=None):
+    loss = NormalDistributionLoss(quantiles=[0.025, 0.1, 0.3, 0.5, 0.7, 0.9, 0.975])
+
     if study:
         params = study.best_params
         del params['gradient_clip_val']
@@ -27,7 +29,7 @@ def create_deepar_model(train_ts_ds, study=None):
             params,
             log_interval=10,
             log_val_interval=3,
-            loss=NormalDistributionLoss(quantiles=[0.1, 0.3, 0.5, 0.7, 0.9])
+            loss=loss
         )
     else:
         deepar = DeepAR.from_dataset(
@@ -37,20 +39,20 @@ def create_deepar_model(train_ts_ds, study=None):
             dropout=0.057,
             log_interval=10,
             log_val_interval=3,
-            loss=NormalDistributionLoss(quantiles=[0.1, 0.3, 0.5, 0.7, 0.9])
+            loss=loss
         )
     return deepar
 
 
-def optimize_deepar_hp(config, train_dl, val_dl, path):
+def optimize_deepar_hp(train_dl, val_dl, study_pkl_path, study_path):
     study = optimize_hyperparameters(
         train_dl,
         val_dl,
-        model_path=config.get("StudyPath"),
+        model_path=study_path,
         n_trials=100,
         max_epochs=20
     )
-    save_to_pickle(study, path)
+    save_to_pickle(study, study_pkl_path)
     return study
 
 
@@ -99,7 +101,7 @@ def optimize_hyperparameters(
     optuna.logging.set_verbosity(optuna_verbose)
 
     loss = kwargs.get(
-        "loss", NormalDistributionLoss()
+        "../Loss", NormalDistributionLoss()
     )  # need a deepcopy of loss as it will otherwise propagate from one trial to the next
 
     def objective(trial: optuna.Trial) -> float:

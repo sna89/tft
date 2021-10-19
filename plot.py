@@ -36,7 +36,7 @@ def plot_groups_attention(config, index_df, model_predictions, dataset_name):
         attention_dfs.append(attention_df)
     attention_df = pd.concat(attention_dfs, axis=0)
     fig = px.line(attention_df, x=attention_df.index, y="data", color='group')
-    fig.write_html(os.path.join('Plots',
+    fig.write_html(os.path.join(PLOT,
                                 dataset_name,
                                 "groups_attention.html"))
 
@@ -56,10 +56,7 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
 
     prediction_idx = predictions[0].shape[1] // 2
     index_df = dataloader.dataset.x_to_index(x)
-    idx_list = list(index_df[index_df.time_idx.isin(list(range(index_df.time_idx.min(),
-                                                               index_df.time_idx.max(),
-                                                               config.get("PredictionLength")
-                                                               )))].index)
+    idx_list = list(range(index_df.index.min(), index_df.index.max(), config.get("PredictionLength")))
 
     if os.getenv("DATASET") == "Fisherman" and model_name == "TFT":
         plot_groups_attention(config, index_df, model_predictions, os.getenv("DATASET"))
@@ -122,7 +119,7 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
             fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
         fig.update_layout(height=800, width=1400)
 
-        fig.write_image(os.path.join('Plots',
+        fig.write_image(os.path.join(PLOT,
                                      dataset_name,
                                      'prediction_sensor_' + str(group) + '_' + str(time_idx) + '.png'),
                         engine='kaleido')
@@ -130,10 +127,10 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
     if model_name == "TFT":
         interpretation = model.interpret_output(model_predictions, reduction="sum", attention_prediction_horizon=0)
         figs = model.plot_interpretation(interpretation)
-        figs['attention'].figure.savefig(os.path.join('Plots', dataset_name, 'attention.png'))
-        figs['static_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'static_variables.png'))
-        figs['encoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'encoder_variables.png'))
-        figs['decoder_variables'].figure.savefig(os.path.join('Plots', dataset_name, 'decoder_variables.png'))
+        figs['attention'].figure.savefig(os.path.join(PLOT, dataset_name, 'attention.png'))
+        figs['static_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'static_variables.png'))
+        figs['encoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'encoder_variables.png'))
+        figs['decoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'decoder_variables.png'))
 
 
 def plot_baseline_predictions(test_dataloader):
@@ -179,7 +176,7 @@ def plot_data(config, dataset_name, data):
     elif dataset_name == 'Fisherman':
         plot_fisherman_data(config, data_to_plot)
     elif dataset_name == 'Straus':
-        plot_straus_data(data_to_plot)
+        plot_straus_data(dataset_name, data_to_plot)
 
 
 def plot_synthetic_data(config, data_to_plot):
@@ -194,10 +191,10 @@ def plot_synthetic_data(config, data_to_plot):
 
 def plot_fisherman_data(config, data_to_plot):
     fig = px.line(data_to_plot, y=config.get("ValueKeyword"), x=DATETIME_COLUMN, color=config.get("GroupKeyword"))
-    fig.write_html(os.path.join(PLOT, 'Fisherman', 'data.html'))
+    fig.write_html(os.path.join(PLOT, 'Fisherman', 'data1.html'))
 
 
-def plot_straus_data(data_to_plot):
+def plot_straus_data(dataset_name, data_to_plot):
     # for qmp_id in pd.unique(data_to_plot['QmpId']):
     #     sub_df = data_to_plot[data_to_plot.QmpId == qmp_id][['ActualValue', 'time_idx', 'key', DATETIME_COLUMN]]
     #     sub_df = sub_df.sort_values(by=['key', DATETIME_COLUMN], ascending=True)
@@ -212,6 +209,6 @@ def plot_straus_data(data_to_plot):
         fig.add_trace(go.Scatter(x=stoppage_df[DATETIME_COLUMN], y=stoppage_df["is_stoppage"],
                                  mode='lines',
                                  name='stoppage'))
-        fig.write_html('straus_data_order_step_id_{}.html'.format(order_step_id))
+        fig.write_html(os.path.join(PLOT, dataset_name, 'straus_data_order_step_id_{}.html'.format(order_step_id)))
     # fig = px.line(data_to_plot, y="ActualValue", x=DATETIME_COLUMN, color='key')
     # fig.write_html('straus_data.html')

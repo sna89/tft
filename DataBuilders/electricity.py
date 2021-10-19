@@ -74,7 +74,7 @@ class ElectricityDataBuilder(DataBuilder):
         data['time_idx'] = data.apply(lambda row: date_time_idx_map[row.date], axis=1)
         return data
 
-    def define_ts_ds(self, train_df):
+    def define_regression_ts_ds(self, train_df):
         electricity_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",

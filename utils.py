@@ -1,6 +1,10 @@
 import pickle
 from typing import List
 import random
+import os
+from pytorch_forecasting.models.temporal_fusion_transformer import TemporalFusionTransformer
+from pytorch_forecasting.models.deepar import DeepAR
+from Models.fc import FullyConnectedModel
 
 
 def save_to_pickle(file, path):
@@ -25,3 +29,21 @@ def get_argmax_from_list(l: List, choose_random=True):
 
 def set_env_to_state(env, state):
     env.current_state = state
+
+
+def get_model_from_trainer(trainer, model_name):
+    best_model_path = trainer.checkpoint_callback.best_model_path
+    os.environ["CHECKPOINT"] = best_model_path
+    best_tft = get_model_from_checkpoint(best_model_path, model_name)
+    return best_tft
+
+
+def get_model_from_checkpoint(checkpoint, model_name):
+    best_model = None
+    if model_name == "TFT":
+        best_model = TemporalFusionTransformer.load_from_checkpoint(checkpoint)
+    elif model_name == "DeepAR":
+        best_model = DeepAR.load_from_checkpoint(checkpoint)
+    elif model_name == "Classification":
+        best_model = FullyConnectedModel.load_from_checkpoint(checkpoint)
+    return best_model

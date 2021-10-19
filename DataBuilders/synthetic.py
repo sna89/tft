@@ -24,7 +24,7 @@ class SyntheticDataBuilder(DataBuilder):
         data[self.config.get("GroupKeyword")] = data[self.config.get("GroupKeyword")].astype(str).astype("category")
         return data
 
-    def define_ts_ds(self, train_df):
+    def define_regression_ts_ds(self, train_df):
         synthetic_train_ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
