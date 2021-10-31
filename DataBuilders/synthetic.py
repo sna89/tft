@@ -10,7 +10,7 @@ class SyntheticDataBuilder(DataBuilder):
     def __init__(self, config):
         super().__init__(config)
 
-    def get_data(self):
+    def build_data(self):
         data = generate_ar_data(seasonality=self.config.get("Seasonality"),
                                 timesteps=self.config.get("Timesteps"),
                                 n_series=self.config.get("Series"),

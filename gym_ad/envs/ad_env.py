@@ -162,8 +162,8 @@ class AdEnv(gym.Env):
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()
-        mode = get_prediction_mode()
-        model_prediction, x = self.model.predict(prediction_df, mode=mode, return_x=True)
+        prediction_mode = get_prediction_mode()
+        model_prediction, x = self.model.predict(prediction_df, mode=prediction_mode, return_x=True)
         if isinstance(model_prediction, dict) and "prediction" in model_prediction:
             model_prediction = model_prediction["prediction"]
         prediction = self._sample_from_prediction(model_prediction)

@@ -10,7 +10,7 @@ def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path):
         train_dl,
         val_dl,
         model_path=study_path,
-        n_trials=25,
+        n_trials=5,
         max_epochs=20,
         gradient_clip_val_range=(0.01, 1.0),
         hidden_size_range=(8, 128),

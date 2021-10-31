@@ -105,7 +105,7 @@ class TrialBasedHeuristicTree:
         else:
             for trial in range(self.num_trials):
                 self._run_trial(current_node)
-            action = self.select_greedy_action(current_node)
+            action = self.select_max_value_action(current_node)
         return action, run_time
 
     def _postprocess_action(self,
@@ -217,7 +217,7 @@ class TrialBasedHeuristicTree:
         raise NotImplementedError
 
     @staticmethod
-    def select_greedy_action(decision_node: DecisionNode):
+    def select_max_value_action(decision_node: DecisionNode):
         successor_values = [successor_node.value for successor_node in decision_node.successors]
         argmax_successor = get_argmax_from_list(successor_values, choose_random=True)
         greedy_action = decision_node.successors[argmax_successor].action

@@ -29,10 +29,10 @@ def plot_volume_by_group(data, agency=None, sku=None):
 def plot_groups_attention(config, index_df, model_predictions, dataset_name):
     attention_dfs = []
     for group in list(index_df[config.get("GroupKeyword")].unique()):
-        sensor_indices = index_df[index_df.Sensor == group].index
-        sensor_attention = model_predictions["attention"][sensor_indices, 0, :,
+        group_indices = index_df[index_df[config.get("GroupKeyword")] == group].index
+        group_attention = model_predictions["attention"][group_indices, 0, :,
                            : model_predictions["encoder_lengths"].max()].mean(1).mean(0)
-        attention_df = pd.DataFrame.from_dict({"group": group, "data": sensor_attention})
+        attention_df = pd.DataFrame.from_dict({"group": group, "data": group_attention})
         attention_dfs.append(attention_df)
     attention_df = pd.concat(attention_dfs, axis=0)
     fig = px.line(attention_df, x=attention_df.index, y="data", color='group')
@@ -54,11 +54,10 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
     elif model_name == "DeepAR":
         predictions = model_predictions
 
-    prediction_idx = predictions[0].shape[1] // 2
     index_df = dataloader.dataset.x_to_index(x)
-    idx_list = list(range(index_df.index.min(), index_df.index.max(), config.get("PredictionLength")))
+    idx_list = list(range(index_df.index.min(), index_df.index.max(), config.get("EncoderLength") + config.get("PredictionLength")))
 
-    if os.getenv("DATASET") == "Fisherman" and model_name == "TFT":
+    if "Fisherman" in os.getenv("DATASET") and model_name == "TFT":
         plot_groups_attention(config, index_df, model_predictions, os.getenv("DATASET"))
 
     for idx in idx_list:
@@ -85,6 +84,7 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
             secondary_y=False,
         )
 
+        prediction_idx = predictions[0].shape[1] // 2
         prediction = predictions[idx][:, prediction_idx]
         # prediction = predictions[idx]
         fig.add_trace(
@@ -170,13 +170,17 @@ def plot_baseline_predictions(test_dataloader):
 
 
 def plot_data(config, dataset_name, data):
-    data_to_plot = data.drop_duplicates(subset=["time_idx"] + [config.get("GroupKeyword")])
+    if "time_idx" in data.columns:
+        data = data.drop_duplicates(subset=["time_idx"] + [config.get("GroupKeyword")])
+
     if dataset_name == 'Synthetic':
-        plot_synthetic_data(config, data_to_plot)
+        plot_synthetic_data(config, data)
     elif dataset_name == 'Fisherman':
-        plot_fisherman_data(config, data_to_plot)
+        plot_fisherman_data(config, data)
+    elif dataset_name == 'Fisherman2':
+        plot_fisherman_data(config, data)
     elif dataset_name == 'Straus':
-        plot_straus_data(dataset_name, data_to_plot)
+        plot_straus_data(dataset_name, data)
 
 
 def plot_synthetic_data(config, data_to_plot):
@@ -191,7 +195,7 @@ def plot_synthetic_data(config, data_to_plot):
 
 def plot_fisherman_data(config, data_to_plot):
     fig = px.line(data_to_plot, y=config.get("ValueKeyword"), x=DATETIME_COLUMN, color=config.get("GroupKeyword"))
-    fig.write_html(os.path.join(PLOT, 'Fisherman', 'data1.html'))
+    fig.write_html(os.path.join(PLOT, 'Fisherman2', 'data.html'))
 
 
 def plot_straus_data(dataset_name, data_to_plot):

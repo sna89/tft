@@ -29,7 +29,7 @@ class ElectricityDataBuilder(DataBuilder):
         self.start_date = start_date
         self.end_date = end_date
 
-    def get_data(self):
+    def build_data(self):
         users_col_names = [self.raw_df_column_prefix + str(i)
                            for i
                            in range(1, self.total_num_columns)]

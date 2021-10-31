@@ -24,7 +24,7 @@ class StallionDataBuilder(DataBuilder):
         super().__init__()
 
     @staticmethod
-    def get_data():
+    def build_data():
         data = get_stallion_data()
         return data
 

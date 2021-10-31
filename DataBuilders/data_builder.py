@@ -15,14 +15,6 @@ class DataBuilder(ABC):
         self.enc_length = config.get("EncoderLength")
         self.prediction_length = config.get("PredictionLength")
 
-    def build_data(self) -> pd.DataFrame():
-        if self.config.get("ProcessedDataPath") and os.path.isfile(self.config.get("ProcessedDataPath")):
-            data = load_pickle(self.config.get("ProcessedDataPath"))
-        else:
-            data = self.get_data()
-            data = self.preprocess(data)
-        return data
-
     def build_ts_data(self, df: pd.DataFrame(), parameters=None, type_="reg"):
         if not parameters:
             if type_ == "reg":
@@ -36,12 +28,11 @@ class DataBuilder(ABC):
             ts_ds = TimeSeriesDataSet.from_parameters(parameters, df)
         return ts_ds, parameters
 
-    def get_data(self):
+    def build_data(self):
         raise NotImplementedError
 
-    @staticmethod
-    def preprocess(data):
-        return data
+    def preprocess(self, data):
+        raise NotImplementedError
 
     @staticmethod
     def add_time_idx_column(data):
@@ -55,7 +46,7 @@ class DataBuilder(ABC):
     def define_regression_ts_ds(train_df):
         raise NotImplementedError
 
-    def split_df(self, data: pd.DataFrame()):
+    def split_train_val_test(self, data: pd.DataFrame()):
         training_max_idx = int(data.time_idx.max() * self.train_ratio)
 
         test_start_idx = int(data.time_idx.max() * (self.train_ratio + self.val_ratio)) - (

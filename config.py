@@ -2,6 +2,7 @@ import os
 import multiprocessing
 import numpy as np
 
+KEY_DELIMITER = '_'
 DATETIME_COLUMN = "Date"
 
 DATA = "Data"
@@ -72,7 +73,23 @@ def get_config(dataset_name):
             "ValueKeyword": "Value",
             "ExceptionKeyword": "future_exceed",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
-            "Resample": "True",
+            "Resample": True,
+        },
+        "Fisherman2": {
+            "Path": os.path.join(DATA_BASE_FOLDER, 'Fisherman2'),
+            "TestDataFramePicklePath": os.path.join('pkl', 'fisherman2_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join('pkl', 'fisherman2_val_df.pkl'),
+            "GroupMappingPicklePath": os.path.join('pkl', 'fisherman2_group_mapping.pkl'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman2', 'Reg'),
+            "EncoderLength": 36,
+            "PredictionLength": 6,
+            "GroupKeyword": "Key",
+            "ValueKeyword": "Value",
+            "ExceptionKeyword": "future_exceed",
+            "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
+            "Resample": False,
+            "SlidingWindow": False,
+            "SlidingWindowSamples": 24,
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
@@ -105,15 +122,15 @@ def get_config(dataset_name):
             "ValueKeyword": "ActualValue",
             "ExceptionKeyword": "is_stoppage",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
-            "EncoderLength": 1440,
+            "EncoderLength": 360,
             "PredictionLength": 30,
         }
     }
 
     train_config = {
         "Train": {
-            "BatchSize": 184,
-            "TrainRatio": 0.5,
+            "BatchSize": 256,
+            "TrainRatio": 0.75,
             "ValRatio": 0.25,
             "CPU": 0
         }

@@ -113,7 +113,7 @@ class TrajectorySample:
         for group_name, actions in self.group_action_product_dict.items():
             if group_name in feasible_alert_groups:
                 group_action_scores = []
-                out_of_bound_list_tuple, _ = self._get_out_ob_bound_list_tuple(prediction, group_name)
+                out_of_bound_list_tuple, _ = self._get_out_of_bound_list_tuple(prediction, group_name)
                 for action in actions:
                     score = 0
                     for out_of_bound, out_of_bound_idx in out_of_bound_list_tuple:
@@ -266,7 +266,7 @@ class TrajectorySample:
                next_state_group_restart_steps_mapping, \
                next_state_group_steps_from_alert_mapping
 
-    def _get_out_ob_bound_list_tuple(self, prediction, group_name):
+    def _get_out_of_bound_list_tuple(self, prediction, group_name):
         group_prediction_trajectories_samples = \
             prediction[self.group_idx_mapping[group_name]][:self.max_steps_from_alert].T
         lb = self.rollout_policy[group_name]['lb']

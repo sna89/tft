@@ -12,16 +12,11 @@ class FishermanDataBuilder(DataBuilder):
     def __init__(self, config):
         super(FishermanDataBuilder, self).__init__(config)
 
-    def get_data(self):
+    def build_data(self):
         dfs = []
         for filename in os.listdir(self.config.get("Path")):
             full_file_path = os.path.join(self.config.get("Path"), filename)
-            df = pd.read_csv(full_file_path, usecols=['Type', 'Value', 'Time'])
-            df = df[df.Type == 'internaltemp']
-            df = df.drop(columns=['Type'], axis=1)
-            df[DATETIME_COLUMN] = pd.to_datetime(df['Time'])
-
-            df[self.config.get("GroupKeyword")] = filename.replace('Sensor ', '').replace('.csv', '')
+            df = self._read_single_file(filename, full_file_path)
             dfs.append(df)
 
         max_min_date = max([df[DATETIME_COLUMN].min() for df in dfs])
@@ -37,11 +32,19 @@ class FishermanDataBuilder(DataBuilder):
         data.reset_index(inplace=True, drop=True)
         return data
 
+    def _read_single_file(self, filename, path):
+        df = pd.read_csv(path, usecols=['Type', 'Value', 'Time'])
+        df = df[df['Type'] == "internaltemp"]
+        df.drop(columns=["Type"], inplace=True)
+        df[DATETIME_COLUMN] = pd.to_datetime(df['Time'])
+        df[self.config.get("GroupKeyword")] = filename.replace('Sensor ', '').replace('.csv', '')
+        return df
+
     def _preprocess_single_df_fisherman(self, data, min_date, max_date):
         data = filter_df_by_date(data, min_date, max_date)
         data.drop_duplicates(inplace=True)
         sensor = data[self.config.get("GroupKeyword")].iloc[0]
-        if self.config.get("Resample") == "True":
+        if self.config.get("Resample"):
             data = data.set_index(DATETIME_COLUMN).resample('1h').mean()
             data[DATETIME_COLUMN] = data.index
         data.fillna(method='bfill', inplace=True)
@@ -74,7 +77,7 @@ class FishermanDataBuilder(DataBuilder):
             add_target_scales=False,
             add_encoder_length=False,
             allow_missing_timesteps=True,
-            # categorical_encoders={"day_of_month": NaNLabelEncoder(add_nan=True)},
+            categorical_encoders={"day_of_month": NaNLabelEncoder(add_nan=True)},
         )
         return fisherman_ts_ds
 
@@ -103,3 +106,5 @@ class FishermanDataBuilder(DataBuilder):
         )
         return fisherman_train_exception_ts_ds
 
+    def preprocess(self, data):
+        return data

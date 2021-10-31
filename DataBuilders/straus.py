@@ -6,12 +6,10 @@ import pandas as pd
 from data_utils import add_dt_columns, assign_time_idx
 from pytorch_forecasting import TimeSeriesDataSet
 from DataBuilders.data_builder import DataBuilder
-from config import DATETIME_COLUMN
+from config import DATETIME_COLUMN, KEY_DELIMITER
 from utils import save_to_pickle
 from pytorch_forecasting.data import NaNLabelEncoder
 
-
-KEY_DELIMITER = '_'
 KEY_COLUMN = 'key'
 BOUNDS_PARAMETER_NAME_LIST = ['MinValue', 'MinWarnValue', 'MaxWarnValue', 'MaxValue']
 PLANT_MODEL_ID = 2629
@@ -27,7 +25,7 @@ class StrausDataBuilder(DataBuilder):
         super(StrausDataBuilder, self).__init__(config)
         self.bounds = {}
 
-    def get_data(self):
+    def build_data(self):
         qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df = self.read_files()
         qmp_order_log_df = self.join_qmp_order_log_data(qmp_log_df, order_log_df)
         stoppage_log_event_df = self.join_stoppage_log_event_data(stoppage_log_df, stoppage_event_df)
@@ -289,7 +287,7 @@ class StrausDataBuilder(DataBuilder):
             static_reals=[],
             time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx", "TargetValue"],
-            time_varying_unknown_categoricals=[self.config.get("ExceptionKeyword")],
+            time_varying_unknown_categoricals=[],
             time_varying_unknown_reals=[
                 self.config.get("ValueKeyword")
             ],
@@ -329,7 +327,7 @@ class StrausDataBuilder(DataBuilder):
         )
         return straus_train_ts_ds
 
-    def split_df(self, data: pd.DataFrame()):
+    def split_train_val_test(self, data: pd.DataFrame()):
         np.random.seed(42)
 
         train_df_list = []

@@ -5,7 +5,7 @@ from Models.trainer import get_model_from_checkpoint
 from utils import load_pickle
 
 config = get_config(os.getenv("DATASET"))
-model = get_model_from_checkpoint(os.getenv("CHECKPOINT"), os.getenv("MODEL_NAME"))
+model = get_model_from_checkpoint(os.getenv("CHECKPOINT_REG"), os.getenv("MODEL_NAME"))
 val_df = load_pickle(config.get("ValDataFramePicklePath"))
 test_df = load_pickle(config.get("TestDataFramePicklePath"))
 
