@@ -1,6 +1,8 @@
 from utils import get_argmax_from_list
 import numpy as np
 
+UCT_BIAS = np.sqrt(2)
+
 
 class Node:
     def __init__(self, state, parent=None):
@@ -70,21 +72,21 @@ class DecisionNode(Node):
 
 
 class ChanceNode(Node):
-    def __init__(self, state, parent=None, action=None, uct_bias=0):
+    def __init__(self, state, parent=None, action=None):
         super(ChanceNode, self).__init__(state, parent)
         self._action = action
         self._reward = 0
-        self.uct_bias = uct_bias
 
     @property
     def uct(self):
         if self.visits == 0:
             uct_value = self.calc_heuristic()
         else:
-            uct_value = self.uct_bias * np.sqrt(np.log(self.parent.visits) / self.visits) + self.value
+            uct_value = UCT_BIAS * np.sqrt(np.log(self.parent.visits) / self.visits) + self.value
         return uct_value
 
-    def calc_heuristic(self):
+    @staticmethod
+    def calc_heuristic():
         return np.Inf
 
     @property

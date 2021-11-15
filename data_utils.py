@@ -102,13 +102,17 @@ def is_future_exceed(config, data, prediction_len, lb, ub):
     return (shifted_values < lb) | (shifted_values > ub)
 
 
-def get_group_idx_mapping(config, model, df):
-    if isinstance(model.hparams.embedding_labels, dict) and \
-            config.get("GroupKeyword") in model.hparams.embedding_labels:
-        return model.hparams.embedding_labels[config.get("GroupKeyword")]
-    else:
-        group_name_list = list(df[config.get("GroupKeyword")].unique())
-        return {group_name: group_name for group_name in group_name_list}
+def get_series_name_idx_mapping(config, ts_ds):
+    series_name_idx_mapping = {}
+    series_ids = pd.unique(ts_ds.index["group_id"])
+    ts_ds_index = ts_ds.index.reset_index()
+
+    for series_id in series_ids:
+        series_indices = ts_ds_index[ts_ds_index["group_id"] == series_id].index
+        series_name = ts_ds.decoded_index.iloc[series_indices.min()][config.get("GroupKeyword")]
+        series_name_idx_mapping[series_id] = series_name
+
+    return series_name_idx_mapping
 
 
 def is_group_prediction_out_of_bound(group_prediction, lb, ub):

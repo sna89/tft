@@ -11,9 +11,9 @@ import gym
 from Algorithms.thts.max_uct import MaxUCT
 from Algorithms.trajectory_sample.trajectory_sample import TrajectorySample
 from data_utils import get_label_weights
+from Algorithms.anomaly_detection.anomaly_detection import AnomalyDetection
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
-from data_utils import get_dataloader
 
 
 if __name__ == '__main__':
@@ -34,14 +34,16 @@ if __name__ == '__main__':
     reg_study = optimize_hp(config, train_ts_ds, val_ts_ds, model_name, type_="reg")
     fitted_reg_model = fit_regression_model(config, train_ts_ds, val_ts_ds, model_name, reg_study, type_="reg")
 
-    evaluate_regression(config, test_ts_ds, fitted_reg_model)
-    plot_reg_predictions(config, fitted_reg_model, test_df, test_ts_ds, dataset_name, model_name)
+    # evaluate_regression(config, test_ts_ds, fitted_reg_model)
+    # plot_reg_predictions(config, fitted_reg_model, test_df, test_ts_ds, dataset_name, model_name)
 
-    save_to_pickle(val_df, config.get("ValDataFramePicklePath"))
-    save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
-    ad_env = gym.make("gym_ad:ad-v0")
-    thts = MaxUCT(ad_env, config)
-    thts.run(test_df)
+    detector = AnomalyDetection(config, model_name, dataset_name, fitted_reg_model)
+    detector.detect(test_df, True)
+
+    # save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
+    # ad_env = gym.make("gym_ad:ad-v0")
+    # thts = MaxUCT(ad_env, config)
+    # thts.run(test_df)
 
     # train_exc_df, val_exc_df, test_exc_df = split_df(config, dataset_name, pd.concat([val_df, test_df], axis=0))
     # train_exc_ts_ds, parameters = convert_df_to_ts_data(config, dataset_name, train_df, None, "class")

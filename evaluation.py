@@ -1,7 +1,7 @@
 import torch
 from pytorch_forecasting import Baseline
 from sklearn.metrics import mean_squared_error, confusion_matrix, mean_absolute_error
-from data_utils import get_dataloader, get_group_idx_mapping
+from data_utils import get_dataloader, get_series_name_idx_mapping
 import pandas as pd
 import os
 
@@ -30,25 +30,13 @@ def evaluate_regression(config, ts_ds, model):
 
 
 def evaluate_regression_groups(config, ts_ds, actual, predictions):
-    group_ids = pd.unique(ts_ds.index["group_id"])
-    ts_ds_index = ts_ds.index.reset_index(drop=True)
+    ts_ds_index = ts_ds.index.reset_index()
+    group_idx_mapping = get_series_name_idx_mapping(config, ts_ds)
 
-    # rh_indices = []
-    temperature_indices = []
-
-    for group_id in group_ids:
+    for group_id, group_name in group_idx_mapping.items():
         group_indices = ts_ds_index[ts_ds_index["group_id"] == group_id].index
         group_name = ts_ds.decoded_index.iloc[group_indices.min()][config.get("GroupKeyword")]
-    #
-    #     if "internalrh" in group_name:
-    #         rh_indices.extend(group_indices)
-    #     elif "internaltemp" in group_name:
-        temperature_indices.extend(group_indices)
-    #
         evaluate_regression_group(actual, predictions, group_name, group_indices)
-
-    # evaluate_regression_group(actual, predictions, "RH", rh_indices)
-    evaluate_regression_group(actual, predictions, "Temperature", temperature_indices)
 
 
 def evaluate_regression_group(actual, predictions, group_name, group_indices):

@@ -14,8 +14,8 @@ MAX_RH_COL = 'Max RH'
 SENSOR_COL = "Sensor"
 INTERNAL_TEMP = "internaltemp"
 INTERNAL_RH = "internalrh"
-NUM_TIME_SERIES = 80
-NUM_SAMPLES_IN_TIME_SERIES = 30 * 6
+NUM_TIME_SERIES = 55
+ENCODER_HOURS = 12
 
 
 class Fisherman2DataBuilder(DataBuilder):
@@ -151,46 +151,48 @@ class Fisherman2DataBuilder(DataBuilder):
         )
         return exception_ts_ds
 
-    def split_train_val_test(self, data: pd.DataFrame()):
-        np.random.seed(42)
-
-        train_dfs = []
-        val_dfs = []
-        test_dfs = []
-
-        dt_index = pd.unique(data[DATETIME_COLUMN])
-        idx = 0
-
-        while idx < NUM_TIME_SERIES:
-            train_dt_start, train_dt_end, val_dt_end, test_dt_end = self._get_train_val_test_times(dt_index)
-
-            if test_dt_end in dt_index:
-                dt_index = self._remove_from_dt_index(dt_index, train_dt_start, test_dt_end)
-
-                train_df = self._get_sliced_df(data, train_dt_start, train_dt_end)
-                train_df = self._update_time_series_key(train_df, idx, "tr")
-
-                val_df = self._get_sliced_df(data, train_dt_end, val_dt_end)
-                val_df = self._update_time_series_key(val_df, idx, "val")
-
-                test_df = self._get_sliced_df(data, val_dt_end, test_dt_end)
-                test_df = self._update_time_series_key(test_df, idx, "te")
-
-                train_dfs.append(train_df)
-                val_dfs.append(val_df)
-                test_dfs.append(test_df)
-
-                idx += 1
-
-        train_df = pd.concat(train_dfs, axis=0)
-        val_df = pd.concat(val_dfs, axis=0)
-        test_df = pd.concat(test_dfs, axis=0)
-
-        train_df.reset_index(drop=True, inplace=True)
-        val_df.reset_index(drop=True, inplace=True)
-        test_df.reset_index(drop=True, inplace=True)
-
-        return train_df, val_df, test_df
+    # def split_train_val_test(self, data: pd.DataFrame()):
+    #     np.random.seed(42)
+    #
+    #     train_dfs = []
+    #     val_dfs = []
+    #     test_dfs = []
+    #
+    #     dt_index = pd.unique(data[DATETIME_COLUMN])
+    #     idx = 0
+    #
+    #     while idx < NUM_TIME_SERIES:
+    #         train_dt_start, train_dt_end, \
+    #         val_dt_start, val_dt_end, \
+    #         test_dt_start, test_dt_end = self._get_train_val_test_times(dt_index)
+    #
+    #         if test_dt_end in dt_index:
+    #             dt_index = self._remove_from_dt_index(dt_index, train_dt_start, test_dt_end)
+    #
+    #             train_df = self._get_sliced_df(data, train_dt_start, train_dt_end)
+    #             train_df = self._update_time_series_key(train_df, idx, "tr")
+    #
+    #             val_df = self._get_sliced_df(data, val_dt_start, val_dt_end)
+    #             val_df = self._update_time_series_key(val_df, idx, "val")
+    #
+    #             test_df = self._get_sliced_df(data, test_dt_start, test_dt_end)
+    #             test_df = self._update_time_series_key(test_df, idx, "te")
+    #
+    #             train_dfs.append(train_df)
+    #             val_dfs.append(val_df)
+    #             test_dfs.append(test_df)
+    #
+    #             idx += 1
+    #
+    #     train_df = pd.concat(train_dfs, axis=0)
+    #     val_df = pd.concat(val_dfs, axis=0)
+    #     test_df = pd.concat(test_dfs, axis=0)
+    #
+    #     train_df.reset_index(drop=True, inplace=True)
+    #     val_df.reset_index(drop=True, inplace=True)
+    #     test_df.reset_index(drop=True, inplace=True)
+    #
+    #     return train_df, val_df, test_df
 
     def _round_dt(self, data):
         data[DATETIME_COLUMN] -= np.array(data[DATETIME_COLUMN].dt.minute % 10, dtype='<m8[m]')
@@ -202,10 +204,15 @@ class Fisherman2DataBuilder(DataBuilder):
     @staticmethod
     def _get_train_val_test_times(dt_index):
         train_dt_start = pd.to_datetime(np.random.choice(dt_index))
-        train_dt_end = train_dt_start + timedelta(days=1, hours=6)
-        val_dt_end = train_dt_end + timedelta(hours=6)
-        test_dt_end = val_dt_end + timedelta(hours=6)
-        return train_dt_start, train_dt_end, val_dt_end, test_dt_end
+        train_dt_end = train_dt_start + timedelta(days=1, hours=ENCODER_HOURS)
+
+        val_dt_start = train_dt_end + timedelta(hours=-ENCODER_HOURS)
+        val_dt_end = train_dt_end + timedelta(hours=ENCODER_HOURS)
+
+        test_dt_start = val_dt_end + timedelta(hours=-ENCODER_HOURS)
+        test_dt_end = val_dt_end + timedelta(hours=ENCODER_HOURS)
+
+        return train_dt_start, train_dt_end, val_dt_start, val_dt_end, test_dt_start, test_dt_end
 
     @staticmethod
     def _remove_from_dt_index(dt_index, start_dt, end_dt):
@@ -225,6 +232,8 @@ class Fisherman2DataBuilder(DataBuilder):
                                               str(idx) + \
                                               KEY_DELIMITER + \
                                               type_
+        df['series'] = idx
+        df['series'] = df['series'].astype(str).astype("category")
         return df
 
     def _add_time_idx(self, data):
@@ -236,5 +245,3 @@ class Fisherman2DataBuilder(DataBuilder):
             dfs.append(sub_df)
         df = pd.concat(dfs, axis=0)
         return df
-
-

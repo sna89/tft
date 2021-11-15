@@ -4,29 +4,28 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 import datetime
-from env_thts_common import get_reward, build_next_state, EnvState, State, get_group_names
+from env_thts_common import get_reward, build_next_state, EnvState, State, get_series_names
 import os
 from config import DATETIME_COLUMN
-from data_utils import add_dt_columns, reverse_key_value_mapping, get_group_idx_mapping
+from data_utils import add_dt_columns, reverse_key_value_mapping, get_series_name_idx_mapping
 from Models.trainer import get_prediction_mode
+from DataBuilders.build import convert_df_to_ts_data
 
 
 class AdEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, config, model, val_df, test_df):
+    def __init__(self, config, forecasting_model, test_df):
         self.env_name = "simulation"
         self.config = config
+        self.forecasting_model = forecasting_model
 
-        self.model = model
-        self.model_pred_len = self.config.get("PredictionLength")
-        self.model_enc_len = self.config.get("EncoderLength")
-
-        self.val_df = val_df
         self.test_df = test_df
-        self.group_idx_mapping = get_group_idx_mapping(self.config, self.model, self.test_df)
-        self.last_date = self._get_last_date(self.val_df)
-        self.last_time_idx = self._get_last_time_idx(self.val_df)
+        self.test_ts_ds, _ = convert_df_to_ts_data(self.config, os.getenv("DATASET"), self.test_df, None, "reg")
+        self.series_name_idx_mapping = get_series_name_idx_mapping(self.config, self.test_ts_ds)
+
+        self.last_date = self._get_last_val_date()
+        self.last_time_idx = self._get_last_val_time_idx()
 
         self.alert_prediction_steps = config.get("Env").get("AlertMaxPredictionSteps")
         self.min_steps_from_alert = config.get("Env").get("AlertMinPredictionSteps")
@@ -51,13 +50,13 @@ class AdEnv(gym.Env):
 
         prediction = self._predict_next_state()
 
-        group_names = get_group_names(self.group_idx_mapping)
-        action = {group_name: action for group_name in group_names}
+        series_names = get_series_names(self.series_name_idx_mapping)
+        action = {series_name: action for series_name in series_names}
 
         next_state, terminal_states, _ = build_next_state(self.env_name,
                                                           self.config,
                                                           self.current_state,
-                                                          group_names,
+                                                          series_names,
                                                           prediction,
                                                           self.max_steps_from_alert,
                                                           self.max_restart_steps,
@@ -65,7 +64,7 @@ class AdEnv(gym.Env):
 
         reward = get_reward(self.env_name,
                             self.config,
-                            group_names,
+                            series_names,
                             terminal_states,
                             self.current_state,
                             action)
@@ -80,7 +79,7 @@ class AdEnv(gym.Env):
 
     def reset(self):
         self.current_state.env_state.clear()
-        last_sample_df = self.val_df[self.val_df.time_idx == self.val_df.time_idx.max()]
+        last_sample_df = self.test_df[self.test_df.time_idx == self._get_last_val_time_idx()]
         for idx, sample in last_sample_df.iterrows():
             state = State(sample[self.config.get("GroupKeyword")],
                           self.max_steps_from_alert,
@@ -94,7 +93,7 @@ class AdEnv(gym.Env):
         pass
 
     def _build_prediction_df(self):
-        prediction_df = self.val_df
+        prediction_df = self.test_df[self.test_df.time_idx <= self._get_last_val_time_idx()]
         new_data = []
 
         for current_series_info in self.current_state.env_state:
@@ -114,7 +113,7 @@ class AdEnv(gym.Env):
     def _add_sample_to_data(self, new_data, value, series, idx_diff):
         data = {self.config.get("GroupKeyword"): series,
                 self.config.get("ValueKeyword"): value,
-                DATETIME_COLUMN: self.last_date + datetime.timedelta(days=idx_diff),
+                DATETIME_COLUMN: self.last_date + datetime.timedelta(hours=idx_diff),
                 'time_idx': self.last_time_idx + idx_diff
                 }
         add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
@@ -123,7 +122,7 @@ class AdEnv(gym.Env):
 
     def _add_dummy_sample_to_data(self, new_data):
         if not new_data:
-            dummy_data = self.val_df[lambda x: x.time_idx == self._get_last_time_idx(self.val_df)].to_dict('records')
+            dummy_data = self.test_df[lambda x: x.time_idx == self._get_last_val_time_idx()].to_dict('records')
         else:
             dummy_data = new_data[-self.num_series:]
         idx_diff = len(self.current_state.env_state[0].history) + 1
@@ -140,39 +139,38 @@ class AdEnv(gym.Env):
         if idx_diff > 0:
             for series_state in self.current_state.env_state:
                 new_data = self._add_sample_to_data(new_data,
-                                                    series_state.temperature,
+                                                    series_state.value,
                                                     series_state.series,
                                                     idx_diff)
         return new_data
 
-    @staticmethod
-    def _get_last_date(df):
-        last_date = df[df.time_idx == df.time_idx.max()][DATETIME_COLUMN].unique()[0]
+    def _get_last_val_date(self):
+        last_date = self.test_df[self.test_df.time_idx == self._get_last_val_time_idx()][DATETIME_COLUMN].unique()[0]
         return pd.to_datetime(last_date)
 
-    @staticmethod
-    def _get_last_time_idx(df):
-        return df.time_idx.max()
+    def _get_last_val_time_idx(self):
+        return self.test_df.time_idx.min() + self.config.get("EncoderLength") + self.config.get("PredictionLength") - 2
 
     def _get_num_quantiles(self):
-        return len(self.model.hparams.loss.quantiles)
+        return len(self.forecasting_model.hparams.loss.quantiles)
 
     def _get_num_series(self):
-        return len(list(self.val_df[self.config.get("GroupKeyword")].unique()))
+        return len(list(self.test_df[self.config.get("GroupKeyword")].unique()))
 
     def _predict_next_state(self):
         prediction_df = self._build_prediction_df()
         prediction_mode = get_prediction_mode()
-        model_prediction, x = self.model.predict(prediction_df, mode=prediction_mode, return_x=True)
-        if isinstance(model_prediction, dict) and "prediction" in model_prediction:
+        model_prediction, x = self.forecasting_model.predict(prediction_df, mode=prediction_mode, return_x=True)
+        if (isinstance(model_prediction, dict) and "prediction" in model_prediction) or \
+                (isinstance(model_prediction, tuple) and "prediction" in model_prediction.keys()):
             model_prediction = model_prediction["prediction"]
         prediction = self._sample_from_prediction(model_prediction)
-        idx_group_mapping = reverse_key_value_mapping(self.group_idx_mapping)
+        idx_group_mapping = reverse_key_value_mapping(self.series_name_idx_mapping)
         if os.getenv("DATASET") == "Fisherman":
             prediction = {idx_group_mapping[idx.item()]: value for idx, value in zip(x["groups"], prediction)}
         elif os.getenv("DATASET") == "Synthetic":
             prediction = {idx_group_mapping[str(idx)]: value for idx, value in
-                          zip(range(self.config.get("Series")), prediction)}
+                          zip(range(self.config.get("NumSeries")), prediction)}
         return prediction
 
 

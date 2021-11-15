@@ -10,21 +10,21 @@ class State:
     series: int
     steps_from_alert: int
     restart_steps: int
-    temperature: float = 0
+    value: float = 0
     history: List[float] = field(default_factory=list)
 
-    def __init__(self, series, steps_from_alert, restart_steps, temperature, history):
+    def __init__(self, series, steps_from_alert, restart_steps, value, history):
         self.series = series
         self.steps_from_alert = steps_from_alert
         self.restart_steps = restart_steps
-        self.temperature = round(temperature, 3)
+        self.value = round(value, 3)
         self.history = history
 
     def __eq__(self, other):
         if isinstance(other, State):
-            if other.series == self.series and other.temperature == self.temperature:
-                for idx, hist_temperature in enumerate(self.history):
-                    if hist_temperature != other.history[idx]:
+            if other.series == self.series and other.value == self.value:
+                for idx, hist_value in enumerate(self.history):
+                    if hist_value != other.history[idx]:
                         return False
                 return True
             else:
@@ -57,7 +57,7 @@ def build_group_next_state(config,
                                              max_restart_steps)
     current_state_terminal = is_state_terminal(config,
                                                group_name,
-                                               current_group_state.temperature,
+                                               current_group_state.value,
                                                current_state_restart)
 
     next_steps_from_alert = update_steps_from_alert(current_state_restart,
@@ -75,7 +75,7 @@ def build_group_next_state(config,
         if next_state_terminal \
         else is_state_restart(next_state_restart_steps, max_restart_steps)
 
-    next_state_history = current_group_state.history + [current_group_state.temperature]
+    next_state_history = current_group_state.history + [current_group_state.value]
     next_state_temperature = next_state_value.item() if isinstance(next_state_value, Tensor) else next_state_value
 
     group_next_state = State(group_name,
@@ -90,7 +90,7 @@ def build_group_next_state(config,
 def build_next_state(env_name,
                      config,
                      current_state: EnvState,
-                     group_names,
+                     series_names,
                      next_state_values: Dict,
                      max_steps_from_alert: int,
                      max_restart_steps: int,
@@ -101,20 +101,20 @@ def build_next_state(env_name,
     terminal_states = {}
     restart_states = {}
 
-    for group_name in group_names:
-        action = action_dict[group_name]
-        current_group_state = get_group_state(current_state.env_state, str(group_name))
-        next_state_value = next_state_values[group_name]
+    for series_name in series_names:
+        action = action_dict[series_name]
+        current_series_state = get_series_state(current_state.env_state, str(series_name))
+        next_state_value = next_state_values[series_name]
 
         group_next_state, terminal, restart = build_group_next_state(config,
                                                                      next_state_value,
-                                                                     current_group_state,
+                                                                     current_series_state,
                                                                      max_restart_steps,
                                                                      max_steps_from_alert,
                                                                      action,
-                                                                     group_name)
-        terminal_states[group_name] = terminal
-        restart_states[group_name] = restart
+                                                                     series_name)
+        terminal_states[series_name] = terminal
+        restart_states[series_name] = restart
         next_state.env_state.append(group_next_state)
 
     return next_state, terminal_states, restart_states
@@ -131,13 +131,13 @@ def get_reward(env_name, config, group_names, next_state_terminal_dict, current_
 
     for group_name in group_names:
         reward = 0
-        current_group_state = get_group_state(current_state.env_state, group_name)
+        current_group_state = get_series_state(current_state.env_state, group_name)
 
         current_state_restart = is_state_restart(current_group_state.restart_steps,
                                                  max_restart_steps)
         current_state_terminal = is_state_terminal(config,
                                                    group_name,
-                                                   current_group_state.temperature,
+                                                   current_group_state.value,
                                                    current_state_restart)
         if current_state_restart or current_state_terminal:
             reward_group_mapping[group_name] = reward
@@ -241,10 +241,10 @@ def is_alertable_state(current_node: DecisionNode, max_alert_prediction_steps: i
     return True
 
 
-def get_group_state(env_state, group):
-    for group_state in env_state:
-        if group == group_state.series:
-            return group_state
+def get_series_state(env_state, series_name):
+    for series_state in env_state:
+        if series_name == series_state.series:
+            return series_state
 
 
 def update_steps_from_alert(current_state_restart,
@@ -281,7 +281,7 @@ def update_restart_steps(current_state_terminal: bool, current_restart_steps: in
     return current_restart_steps
 
 
-def get_group_names(group_idx_mapping):
+def get_series_names(group_idx_mapping):
     return list(group_idx_mapping.keys())
 
 

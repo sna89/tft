@@ -81,7 +81,7 @@ def get_config(dataset_name):
             "ValDataFramePicklePath": os.path.join('pkl', 'fisherman2_val_df.pkl'),
             "GroupMappingPicklePath": os.path.join('pkl', 'fisherman2_group_mapping.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman2', 'Reg'),
-            "EncoderLength": 36,
+            "EncoderLength": 72,
             "PredictionLength": 6,
             "GroupKeyword": "Key",
             "ValueKeyword": "Value",
@@ -93,19 +93,17 @@ def get_config(dataset_name):
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
+            "Filename": "SyntheticDataset.csv",
             "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
-            "ValDataFramePicklePath": os.path.join('pkl', 'synthetic_val_df.pkl'),
-            "StudyPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic'),
-            "EncoderLength": 30,
-            "PredictionLength": 1,
-            "Series": 3,
-            "Seasonality": 30,
-            "Trend": 2,
-            "Noise": 0.05,
-            "Timesteps": 600,
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', 'Reg'),
+            "NumSeries": 10,
+            "NumSubSeries": 12,
+            "TimestepsPerSubSeries": 24*7,
+            "EncoderLength": 24*2,
+            "PredictionLength": 6,
             "GroupKeyword": "series",
             "ValueKeyword": "value",
-            "DatetimeAdditionalColumns": ['month', 'day_of_month']
+            "DatetimeAdditionalColumns": ['month', 'hour', 'day_of_month', 'day_of_week']
         },
         "Stallion": {
             "EncoderLength": 14,
@@ -130,8 +128,8 @@ def get_config(dataset_name):
     train_config = {
         "Train": {
             "BatchSize": 256,
-            "TrainRatio": 0.75,
-            "ValRatio": 0.25,
+            "TrainRatio": 0.6,
+            "ValRatio": 0.2,
             "CPU": 0
         }
     }
@@ -141,17 +139,45 @@ def get_config(dataset_name):
             {
                 "Synthetic": {
                     "0": {
-                        "lb": 1,
-                        "hb": 2.3,
+                        "lb": -1.2,
+                        "hb": 1.2,
                     },
                     "1": {
                         "lb": -0.5,
                         "hb": 0.5,
                     },
                     "2": {
-                        "lb": -1.5,
-                        "hb": 0.5,
-                    }
+                        "lb": -1,
+                        "hb": 1.5,
+                    },
+                    "3": {
+                        "lb": -2,
+                        "hb": 1,
+                    },
+                    "4": {
+                        "lb": -2,
+                        "hb": 2,
+                    },
+                    "5": {
+                        "lb": -1,
+                        "hb": 1,
+                    },
+                    "6": {
+                        "lb": -0.4,
+                        "hb": 0.6,
+                    },
+                    "7": {
+                        "lb": -0.15,
+                        "hb": 0.15,
+                    },
+                    "8": {
+                        "lb": -0.8,
+                        "hb": 0.8,
+                    },
+                    "9": {
+                        "lb": -0.75,
+                        "hb": 0.6,
+                    },
                 },
                 "Fisherman": {
                     "U100330": {
@@ -196,7 +222,7 @@ def get_config(dataset_name):
         "Env": {
             "AlertMaxPredictionSteps": 7,
             "AlertMinPredictionSteps": 0,
-            "RestartSteps": 3,
+            "RestartSteps": 0,
             "Rewards": {
                 "MissedAlert": -100,
                 "FalseAlert": -100,
@@ -205,9 +231,7 @@ def get_config(dataset_name):
         },
         "THTS": {
             "NumTrials": 75,
-            "TrialLength": 6,
-            "UCTBias": np.sqrt(2),
-            "Runs": 1
+            "TrialLength": 6
         }
 
     }

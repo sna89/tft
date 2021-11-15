@@ -2,7 +2,7 @@ from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 from utils import get_argmax_from_list, set_env_to_state
 from env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
-    get_group_state, get_group_names, get_num_iterations
+    get_series_state, get_series_names, get_num_iterations
 import time
 import pandas as pd
 from typing import Dict, List
@@ -14,17 +14,15 @@ from data_utils import get_group_lower_and_upper_bounds, is_group_prediction_out
 class TrialBasedHeuristicTree:
     def __init__(self, env, config):
         self.env_name = "real"
-        self.env = env
-        self.model = self.env.model
-        self.group_idx_mapping = self.env.group_idx_mapping
-        self.group_names = get_group_names(self.group_idx_mapping)
-        self.num_actions = self.env.action_space.n
         self.config = config
+        self.env = env
+        self.forecasting_model = self.env.forecasting_model
+        self.group_idx_mapping = self.env.series_name_idx_mapping
+        self.group_names = get_series_names(self.group_idx_mapping)
+        self.num_actions = self.env.action_space.n
 
         self.num_trials = config.get("THTS").get("NumTrials")
         self.trial_length = config.get("THTS").get("TrialLength")
-        self.uct_bias = config.get("THTS").get("UCTBias")
-        self.runs = config.get("THTS").get("Runs")
         self.alert_prediction_steps = self.env.max_steps_from_alert
         self.consider_trial_length = True
         self.restart_env_iterations = self.env.max_restart_steps
@@ -33,64 +31,63 @@ class TrialBasedHeuristicTree:
         state = self.get_initial_state()
         initial_node = DecisionNode(state, parent=None)
 
-        for run in range(1, self.runs + 1):
-            current_node = deepcopy(initial_node)
+        current_node = deepcopy(initial_node)
 
-            action_history = []
-            reward_history = []
-            terminal_history = [{group_name: False for group_name in self.group_names}]
-            restart_history = [{group_name: False for group_name in self.group_names}]
-            alert_prediction_steps_history = []
-            restart_steps_history = []
+        action_history = []
+        reward_history = []
+        terminal_history = [{group_name: False for group_name in self.group_names}]
+        restart_history = [{group_name: False for group_name in self.group_names}]
+        alert_prediction_steps_history = []
+        restart_steps_history = []
 
-            num_iterations = get_num_iterations(test_df, self.env.model_enc_len)
-            statistics = init_statistics(self.group_names)
+        num_iterations = get_num_iterations(test_df, self.config.get("EncoderLength"))
+        statistics = init_statistics(self.group_names)
 
-            for iteration in range(1, num_iterations):
-                start = time.time()
-                action, run_time = self._before_transition(current_node)
-                action_dict = self._postprocess_action(action,
-                                                       current_node,
-                                                       terminal_history,
-                                                       restart_history,
-                                                       test_df,
-                                                       iteration)
+        for iteration in range(1, num_iterations):
+            start = time.time()
+            action, run_time = self._before_transition(current_node)
+            action_dict = self._postprocess_action(action,
+                                                   current_node,
+                                                   terminal_history,
+                                                   restart_history,
+                                                   test_df,
+                                                   iteration)
 
-                next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
-                                                                                                  test_df,
-                                                                                                  iteration,
-                                                                                                  action_dict)
+            next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
+                                                                                              test_df,
+                                                                                              iteration,
+                                                                                              action_dict)
 
-                next_state = self._after_transition(next_state, env_terminal_list)
+            next_state = self._after_transition(next_state, env_terminal_list)
 
-                action_history.append(action_dict)
-                reward_history.append(reward)
-                terminal_history.append(env_terminal_list)
-                restart_history.append(restart_states)
-                alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
-                                                       for group_state
-                                                       in current_node.state.env_state})
-                restart_steps_history.append({group_state.series: group_state.restart_steps
-                                              for group_state
-                                              in current_node.state.env_state})
+            action_history.append(action_dict)
+            reward_history.append(reward)
+            terminal_history.append(env_terminal_list)
+            restart_history.append(restart_states)
+            alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
+                                                   for group_state
+                                                   in current_node.state.env_state})
+            restart_steps_history.append({group_state.series: group_state.restart_steps
+                                          for group_state
+                                          in current_node.state.env_state})
 
-                end = time.time()
-                run_time = end - start
+            end = time.time()
+            run_time = end - start
 
-                statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
+            statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
 
-                render(self.config,
-                       self.group_names,
-                       test_df,
-                       run_time,
-                       action_history,
-                       reward_history,
-                       terminal_history,
-                       restart_history,
-                       alert_prediction_steps_history,
-                       restart_steps_history)
+            render(self.config,
+                   self.group_names,
+                   test_df,
+                   run_time,
+                   action_history,
+                   reward_history,
+                   terminal_history,
+                   restart_history,
+                   alert_prediction_steps_history,
+                   restart_steps_history)
 
-                current_node = DecisionNode(next_state, parent=current_node, terminal=False)
+            current_node = DecisionNode(next_state, parent=current_node, terminal=False)
             print(statistics)
 
     def get_initial_state(self):
@@ -122,11 +119,11 @@ class TrialBasedHeuristicTree:
             action_dict = {}
             time_idx_range = self.get_encoder_time_idx_range(test_df, iteration)
             prediction_df = test_df[test_df.time_idx.isin(time_idx_range)]
-            prediction, x = self.model.predict(prediction_df, mode="prediction", return_x=True)
+            prediction, x = self.forecasting_model.predict(prediction_df, mode="prediction", return_x=True)
             for group_name in self.group_names:
                 is_restart = terminal_history[-1][group_name]
                 is_terminal = restart_history[-1][group_name]
-                group_state = get_group_state(current_node.state.env_state, group_name)
+                group_state = get_series_state(current_node.state.env_state, group_name)
                 if not is_restart \
                         and not is_terminal \
                         and group_state.steps_from_alert == self.env.max_steps_from_alert:
@@ -223,11 +220,11 @@ class TrialBasedHeuristicTree:
         greedy_action = decision_node.successors[argmax_successor].action
         return greedy_action
 
-    def add_chance_node(self, decision_node: DecisionNode, action: int):
+    @staticmethod
+    def add_chance_node(decision_node: DecisionNode, action: int):
         chance_node = ChanceNode(state=decision_node.state,
                                  parent=decision_node,
-                                 action=action,
-                                 uct_bias=self.uct_bias)
+                                 action=action)
         decision_node.add_successor(chance_node)
 
     @staticmethod
