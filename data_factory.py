@@ -4,6 +4,8 @@ from DataBuilders.synthetic import SyntheticDataBuilder
 from DataBuilders.electricity import ElectricityDataBuilder
 from DataBuilders.straus import StrausDataBuilder
 from DataBuilders.fisherman2 import Fisherman2DataBuilder
+from DataBuilders.smd import SMDDataBuilder
+from DataBuilders.msl import MSLDataBuilder
 
 
 def get_data_builder(config, dataset_name):
@@ -19,5 +21,9 @@ def get_data_builder(config, dataset_name):
         return ElectricityDataBuilder(config)
     elif dataset_name == "Straus":
         return StrausDataBuilder(config)
+    elif dataset_name == "SMD":
+        return SMDDataBuilder(config)
+    elif dataset_name == "MSL":
+        return MSLDataBuilder(config)
     else:
         raise ValueError()

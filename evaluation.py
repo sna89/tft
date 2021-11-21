@@ -35,7 +35,6 @@ def evaluate_regression_groups(config, ts_ds, actual, predictions):
 
     for group_id, group_name in group_idx_mapping.items():
         group_indices = ts_ds_index[ts_ds_index["group_id"] == group_id].index
-        group_name = ts_ds.decoded_index.iloc[group_indices.min()][config.get("GroupKeyword")]
         evaluate_regression_group(actual, predictions, group_name, group_indices)
 
 
@@ -47,10 +46,14 @@ def evaluate_regression_group(actual, predictions, group_name, group_indices):
 
 def evaluate_classification(config, ts_ds, model):
     dl = get_dataloader(ts_ds, False, config)
-    actuals = get_actuals(dl)
+    actual = get_actuals(dl)
     predictions, x = model.predict(dl, return_x=True, show_progress_bar=True)
 
-    tn, fp, fn, tp = confusion_matrix(actuals.reshape(-1, 1), predictions.reshape(-1, 1)).ravel()
+    get_classification_evaluation_summary(actual, predictions)
+
+
+def get_classification_evaluation_summary(actual, predictions):
+    tn, fp, fn, tp = confusion_matrix(actual.reshape(-1, 1), predictions.reshape(-1, 1)).ravel()
     print("TN: {}, FP: {}, FN: {}, TP: {}".format(tn, fp, fn, tp))
 
     precision = tp / (float(tp + fp))

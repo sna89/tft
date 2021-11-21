@@ -132,3 +132,11 @@ def get_label_weights(df, labels, label_keyword):
     max_weight = max(weights)
     weights = [max_weight / weight for weight in weights]
     return weights
+
+
+def flatten_nested_list(nl):
+    flat_list = []
+    for sublist in nl:
+        for item in sublist:
+            flat_list.append(item)
+    return flat_list

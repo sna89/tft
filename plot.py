@@ -76,13 +76,21 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
 
 def plot_single_prediction(config, df, index_df, idx, predictions, x, model_name, dataset_name, interpretation=None):
     time_idx, group = index_df.iloc[idx].values
+    if dataset_name == "MSL":
+        time_idx = int(df[(df["time_idx"] == time_idx) & (df[config.get("GroupKeyword")] == group)]["test_time_idx"])
+
     sub_df = df[df[config.get("GroupKeyword")] == group]
-    x_values_enc = pd.DatetimeIndex(
-        sub_df[(sub_df.time_idx <= time_idx) & (sub_df.time_idx >= time_idx - config.get("EncoderLength"))][
-            DATETIME_COLUMN].unique())
-    x_values_pred = pd.DatetimeIndex(
-        sub_df[(sub_df.time_idx > time_idx) & (sub_df.time_idx <= time_idx + config.get("PredictionLength"))][
-            DATETIME_COLUMN].unique())
+    if DATETIME_COLUMN in df.columns:
+        x_values_enc = pd.DatetimeIndex(
+            sub_df[(sub_df.time_idx <= time_idx) & (sub_df.time_idx >= time_idx - config.get("EncoderLength"))][
+                DATETIME_COLUMN].unique())
+        x_values_pred = pd.DatetimeIndex(
+            sub_df[(sub_df.time_idx > time_idx) & (sub_df.time_idx <= time_idx + config.get("PredictionLength"))][
+                DATETIME_COLUMN].unique())
+    else:
+        time_column = "time_idx" if dataset_name != "MSL" else "test_time_idx"
+        x_values_enc = sub_df[(sub_df[time_column] <= time_idx) & (sub_df[time_column] >= time_idx - config.get("EncoderLength"))][time_column]
+        x_values_pred = sub_df[(sub_df[time_column] > time_idx) & (sub_df[time_column] <= time_idx + config.get("PredictionLength"))][time_column]
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
@@ -176,7 +184,7 @@ def plot_baseline_predictions(test_dataloader):
 
 
 def plot_data(config, dataset_name, data):
-    if "time_idx" in data.columns:
+    if "time_idx" in data.columns and dataset_name != "SMD":
         data = data.drop_duplicates(subset=["time_idx"] + [config.get("GroupKeyword")])
 
     if dataset_name == 'Synthetic':
@@ -187,6 +195,10 @@ def plot_data(config, dataset_name, data):
         plot_fisherman_data(config, data)
     elif dataset_name == 'Straus':
         plot_straus_data(dataset_name, data)
+    elif dataset_name == 'SMD':
+        plot_smd_data(config, data, dataset_name)
+    elif dataset_name == 'MSL':
+        plot_smd_data(config, data, dataset_name)
 
 
 def plot_synthetic_data(data_to_plot):
@@ -198,6 +210,20 @@ def plot_synthetic_data(data_to_plot):
 def plot_fisherman_data(config, data_to_plot):
     fig = px.line(data_to_plot, y=config.get("ValueKeyword"), x=DATETIME_COLUMN, color=config.get("GroupKeyword"))
     fig.write_html(os.path.join(PLOT, 'Fisherman2', 'data.html'))
+
+
+def plot_smd_data(config, data_to_plot, dataset_name):
+    fig = px.line(data_to_plot, y=config.get("ValueKeyword"), x="time_idx", color=config.get("GroupKeyword"))
+    fig.write_html(os.path.join(PLOT, dataset_name, 'data.html'))
+
+
+def plot_msl_data(config, data_to_plot, dataset_name):
+    data_to_plot["Key"] = data_to_plot[config.get("GroupColumns")[0]] +\
+                          "_" + \
+                          data_to_plot[config.get("GroupColumns")[1]].astype(str)
+    fig = px.line(data_to_plot, x="time_idx", y=config.get("ValueKeyword"), color="Key")
+    fig.write_html(os.path.join(PLOT, dataset_name, 'data.html'))
+
 
 
 def plot_straus_data(dataset_name, data_to_plot):

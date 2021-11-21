@@ -46,12 +46,12 @@ def create_tft_model(training_data: TimeSeriesDataSet, study=None):
         tft = TemporalFusionTransformer.from_dataset(
             training_data,
             # not meaningful for finding the learning rate but otherwise very important
-            learning_rate=0.0544,
-            hidden_size=64,  # most important hyperparameter apart from learning rate
+            learning_rate=0.005,
+            hidden_size=128,  # most important hyperparameter apart from learning rate
             # number of attention heads. Set to up to 4 for large datasets
-            attention_head_size=2,
-            dropout=0.194,  # between 0.1 and 0.3 are good values
-            hidden_continuous_size=10,  # set to <= hidden_size
+            attention_head_size=4,
+            dropout=0.1,  # between 0.1 and 0.3 are good values
+            hidden_continuous_size=32,  # set to <= hidden_size
             output_size=output_size,
             loss=loss,
             # reduce learning rate if no improvement in validation loss after x epochs

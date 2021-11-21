@@ -112,7 +112,6 @@ def get_config(dataset_name):
         "Straus": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
             "TestDataFramePicklePath": os.path.join('pkl', 'straus_test_df.pkl'),
-            "ValDataFramePicklePath": os.path.join('pkl', 'straus_val_df.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', 'Reg'),
             "ProcessedDataPath": os.path.join('pkl', 'straus_processed_df.pkl'),
             "GroupKeyword": "key",
@@ -122,12 +121,30 @@ def get_config(dataset_name):
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "EncoderLength": 360,
             "PredictionLength": 30,
+        },
+        "SMD": {
+            "Path": os.path.join(DATA_BASE_FOLDER, 'SMD'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', 'Reg'),
+            "GroupColumns": ["Machine", "Dimension"],
+            "ValueKeyword": "Value",
+            "LabelKeyword": "Label",
+            "EncoderLength": 300,
+            "PredictionLength": 10,
+        },
+        "MSL": {
+            "Path": os.path.join(DATA_BASE_FOLDER, 'SMAP_MSL'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'MSL', 'Reg'),
+            "GroupKeyword": "Channel",
+            "ValueKeyword": "Value",
+            "LabelKeyword": "Label",
+            "EncoderLength": 100,
+            "PredictionLength": 10,
         }
     }
 
     train_config = {
         "Train": {
-            "BatchSize": 256,
+            "BatchSize": 128,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0

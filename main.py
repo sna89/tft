@@ -2,7 +2,7 @@ import pandas as pd
 from config import get_config
 from Models.trainer import optimize_hp, fit_regression_model, create_classification_model, fit_classification_model
 from DataBuilders.build import build_data, split_df, convert_df_to_ts_data, process_data
-from evaluation import evaluate_regression, evaluate_classification
+from evaluation import evaluate_regression, evaluate_classification, get_classification_evaluation_summary
 import warnings
 import os
 from utils import save_to_pickle
@@ -27,6 +27,7 @@ if __name__ == '__main__':
     # plot_data(config, dataset_name, data)
 
     train_df, val_df, test_df = split_df(config, dataset_name, data)
+    test_df = test_df[test_df["Channel"] == "C-1"]
     train_ts_ds, parameters = convert_df_to_ts_data(config, dataset_name, train_df, None, "reg")
     val_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, val_df, parameters, "reg")
     test_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, test_df, parameters, "reg")
@@ -38,7 +39,7 @@ if __name__ == '__main__':
     # plot_reg_predictions(config, fitted_reg_model, test_df, test_ts_ds, dataset_name, model_name)
 
     detector = AnomalyDetection(config, model_name, dataset_name, fitted_reg_model)
-    detector.detect(test_df, True)
+    anomaly_df = detector.detect_and_evaluate(test_df, test_ts_ds, True)
 
     # save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
     # ad_env = gym.make("gym_ad:ad-v0")
