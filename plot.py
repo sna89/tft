@@ -188,7 +188,7 @@ def plot_data(config, dataset_name, data):
         data = data.drop_duplicates(subset=["time_idx"] + [config.get("GroupKeyword")])
 
     if dataset_name == 'Synthetic':
-        plot_synthetic_data(data)
+        plot_synthetic_data(config, data)
     elif dataset_name == 'Fisherman':
         plot_fisherman_data(config, data)
     elif dataset_name == 'Fisherman2':
@@ -201,10 +201,10 @@ def plot_data(config, dataset_name, data):
         plot_smd_data(config, data, dataset_name)
 
 
-def plot_synthetic_data(data_to_plot):
+def plot_synthetic_data(config, data_to_plot):
     plot_name = "Synthetic_dataset.html"
-    fig = px.line(data_to_plot, y="value", x=DATETIME_COLUMN, color='series')
-    fig.write_html(plot_name)
+    fig = px.line(data_to_plot, y=config.get("ValueKeyword"), x="time_idx", color=config.get("GroupKeyword"))
+    fig.write_html(os.path.join(PLOT, 'Synthetic', plot_name))
 
 
 def plot_fisherman_data(config, data_to_plot):

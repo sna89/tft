@@ -1,7 +1,7 @@
 import torch
 from pytorch_forecasting import Baseline
 from sklearn.metrics import mean_squared_error, confusion_matrix, mean_absolute_error
-from data_utils import get_dataloader, get_series_name_idx_mapping
+from data_utils import get_dataloader, get_group_id_group_name_mapping
 import pandas as pd
 import os
 
@@ -31,9 +31,9 @@ def evaluate_regression(config, ts_ds, model):
 
 def evaluate_regression_groups(config, ts_ds, actual, predictions):
     ts_ds_index = ts_ds.index.reset_index()
-    group_idx_mapping = get_series_name_idx_mapping(config, ts_ds)
+    group_id_group_name_mapping = get_group_id_group_name_mapping(config, ts_ds)
 
-    for group_id, group_name in group_idx_mapping.items():
+    for group_id, group_name in group_id_group_name_mapping.items():
         group_indices = ts_ds_index[ts_ds_index["group_id"] == group_id].index
         evaluate_regression_group(actual, predictions, group_name, group_indices)
 

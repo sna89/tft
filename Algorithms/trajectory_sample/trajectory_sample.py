@@ -1,12 +1,12 @@
 import pandas as pd
-from env_thts_common import get_num_iterations, get_series_names, \
+from env_thts_common import get_num_iterations, get_group_names, \
      calc_reward, is_state_terminal
 import os
 import numpy as np
 import time
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics
-from data_utils import get_group_lower_and_upper_bounds, get_series_name_idx_mapping, is_group_prediction_out_of_bound
+from data_utils import get_group_lower_and_upper_bounds, get_group_id_group_name_mapping, is_group_prediction_out_of_bound
 
 
 class TrajectorySample:
@@ -24,8 +24,8 @@ class TrajectorySample:
         self.test_df = test_df
         self.num_trajectories = num_trajectories
 
-        self.group_idx_mapping = get_series_name_idx_mapping(self.config, self.deepar_model, test_df)
-        self.group_names = get_series_names(self.group_idx_mapping)
+        self.group_idx_mapping = get_group_id_group_name_mapping(self.config, self.deepar_model, test_df)
+        self.group_names = get_group_names(self.group_idx_mapping)
 
         self.actions = [0, 1]
         self.group_action_product_dict = self._define_actions()

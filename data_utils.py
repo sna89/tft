@@ -102,17 +102,17 @@ def is_future_exceed(config, data, prediction_len, lb, ub):
     return (shifted_values < lb) | (shifted_values > ub)
 
 
-def get_series_name_idx_mapping(config, ts_ds):
-    series_name_idx_mapping = {}
-    series_ids = pd.unique(ts_ds.index["group_id"])
+def get_group_id_group_name_mapping(config, ts_ds):
+    group_id_group_name_mapping = {}
+    group_ids = pd.unique(ts_ds.index["group_id"])
     ts_ds_index = ts_ds.index.reset_index()
 
-    for series_id in series_ids:
-        series_indices = ts_ds_index[ts_ds_index["group_id"] == series_id].index
-        series_name = ts_ds.decoded_index.iloc[series_indices.min()][config.get("GroupKeyword")]
-        series_name_idx_mapping[series_id] = series_name
+    for group_id in group_ids:
+        group_indices = ts_ds_index[ts_ds_index["group_id"] == group_id].index
+        group_name = ts_ds.decoded_index.iloc[group_indices.min()][config.get("GroupKeyword")]
+        group_id_group_name_mapping[group_id] = group_name
 
-    return series_name_idx_mapping
+    return group_id_group_name_mapping
 
 
 def is_group_prediction_out_of_bound(group_prediction, lb, ub):

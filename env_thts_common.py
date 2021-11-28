@@ -3,18 +3,20 @@ from dataclasses import dataclass, field
 from torch import Tensor
 from Algorithms.thts.node import DecisionNode
 from data_utils import get_group_lower_and_upper_bounds
+from config import DATETIME_COLUMN
+import pandas as pd
 
 
 @dataclass
 class State:
-    series: int
+    group: int
     steps_from_alert: int
     restart_steps: int
     value: float = 0
     history: List[float] = field(default_factory=list)
 
-    def __init__(self, series, steps_from_alert, restart_steps, value, history):
-        self.series = series
+    def __init__(self, group, steps_from_alert, restart_steps, value, history):
+        self.group = group
         self.steps_from_alert = steps_from_alert
         self.restart_steps = restart_steps
         self.value = round(value, 3)
@@ -22,7 +24,7 @@ class State:
 
     def __eq__(self, other):
         if isinstance(other, State):
-            if other.series == self.series and other.value == self.value:
+            if other.group == self.group and other.value == self.value:
                 for idx, hist_value in enumerate(self.history):
                     if hist_value != other.history[idx]:
                         return False
@@ -68,6 +70,7 @@ def build_group_next_state(config,
     next_state_terminal = False \
         if current_state_restart and current_group_state.restart_steps > 1 \
         else is_state_terminal(config, group_name, next_state_value)
+
     next_state_restart_steps = update_restart_steps(current_state_terminal,
                                                     current_group_state.restart_steps,
                                                     max_restart_steps)
@@ -76,12 +79,12 @@ def build_group_next_state(config,
         else is_state_restart(next_state_restart_steps, max_restart_steps)
 
     next_state_history = current_group_state.history + [current_group_state.value]
-    next_state_temperature = next_state_value.item() if isinstance(next_state_value, Tensor) else next_state_value
+    next_state_value = next_state_value.item() if isinstance(next_state_value, Tensor) else next_state_value
 
     group_next_state = State(group_name,
                              next_steps_from_alert,
                              next_state_restart_steps,
-                             next_state_temperature,
+                             next_state_value,
                              next_state_history)
 
     return group_next_state, next_state_terminal, next_state_restart
@@ -90,7 +93,7 @@ def build_group_next_state(config,
 def build_next_state(env_name,
                      config,
                      current_state: EnvState,
-                     series_names,
+                     group_names,
                      next_state_values: Dict,
                      max_steps_from_alert: int,
                      max_restart_steps: int,
@@ -101,20 +104,20 @@ def build_next_state(env_name,
     terminal_states = {}
     restart_states = {}
 
-    for series_name in series_names:
-        action = action_dict[series_name]
-        current_series_state = get_series_state(current_state.env_state, str(series_name))
-        next_state_value = next_state_values[series_name]
+    for group_name in group_names:
+        action = action_dict[group_name]
+        current_group_state = get_group_state(current_state.env_state, str(group_name))
+        next_state_value = next_state_values[group_name]
 
         group_next_state, terminal, restart = build_group_next_state(config,
                                                                      next_state_value,
-                                                                     current_series_state,
+                                                                     current_group_state,
                                                                      max_restart_steps,
                                                                      max_steps_from_alert,
                                                                      action,
-                                                                     series_name)
-        terminal_states[series_name] = terminal
-        restart_states[series_name] = restart
+                                                                     group_name)
+        terminal_states[group_name] = terminal
+        restart_states[group_name] = restart
         next_state.env_state.append(group_next_state)
 
     return next_state, terminal_states, restart_states
@@ -123,15 +126,15 @@ def build_next_state(env_name,
 def get_reward(env_name, config, group_names, next_state_terminal_dict, current_state, action_dict: Dict) \
         -> Union[Dict, float]:
     assert env_name in ["simulation", "real"]
-    max_steps_from_alert = config.get("Env").get("AlertMaxPredictionSteps") + 1
-    min_steps_from_alert = config.get("Env").get("AlertMinPredictionSteps") + 1
-    max_restart_steps = config.get("Env").get("RestartSteps") + 1
+    max_steps_from_alert = get_max_steps_from_alert(config)
+    min_steps_from_alert = get_min_steps_from_alert(config)
+    max_restart_steps = get_max_restart_steps(config)
 
     reward_group_mapping = {}
 
     for group_name in group_names:
         reward = 0
-        current_group_state = get_series_state(current_state.env_state, group_name)
+        current_group_state = get_group_state(current_state.env_state, group_name)
 
         current_state_restart = is_state_restart(current_group_state.restart_steps,
                                                  max_restart_steps)
@@ -143,14 +146,11 @@ def get_reward(env_name, config, group_names, next_state_terminal_dict, current_
             reward_group_mapping[group_name] = reward
             continue
 
-        next_state_terminal = next_state_terminal_dict[group_name]
-        action = action_dict[group_name]
-
         good_alert, false_alert, missed_alert = get_reward_type_for_group(current_group_state.steps_from_alert,
                                                                           min_steps_from_alert,
                                                                           max_steps_from_alert,
-                                                                          next_state_terminal,
-                                                                          action)
+                                                                          next_state_terminal_dict[group_name],
+                                                                          action_dict[group_name])
 
         reward += calc_reward(config,
                               good_alert,
@@ -241,10 +241,10 @@ def is_alertable_state(current_node: DecisionNode, max_alert_prediction_steps: i
     return True
 
 
-def get_series_state(env_state, series_name):
-    for series_state in env_state:
-        if series_name == series_state.series:
-            return series_state
+def get_group_state(env_state, group_name):
+    for group_state in env_state:
+        if group_name == group_state.group:
+            return group_state
 
 
 def update_steps_from_alert(current_state_restart,
@@ -281,8 +281,8 @@ def update_restart_steps(current_state_terminal: bool, current_restart_steps: in
     return current_restart_steps
 
 
-def get_series_names(group_idx_mapping):
-    return list(group_idx_mapping.keys())
+def get_group_names(group_name_group_idx_mapping):
+    return list(group_name_group_idx_mapping.values())
 
 
 def is_state_restart(restart_steps, max_restart_steps):
@@ -292,3 +292,34 @@ def is_state_restart(restart_steps, max_restart_steps):
 def get_num_iterations(test_df, enc_len):
     num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - enc_len + 3
     return num_iterations
+
+
+def get_last_val_time_idx(config, test_df):
+    return test_df.time_idx.min() + config.get("EncoderLength") + config.get("PredictionLength") - 2
+
+
+def get_last_val_date(test_df, last_val_time_idx):
+    if DATETIME_COLUMN in test_df.columns:
+        last_date = test_df[test_df.time_idx == last_val_time_idx][DATETIME_COLUMN].unique()[0]
+        return pd.to_datetime(last_date)
+    return None
+
+
+def get_steps_from_alert(config):
+    return config.get("Env").get("AlertMaxPredictionSteps")
+
+
+def get_max_steps_from_alert(config):
+    return get_steps_from_alert(config) + 1
+
+
+def get_min_steps_from_alert(config):
+    return config.get("Env").get("AlertMinPredictionSteps")
+
+
+def get_restart_steps(config):
+    return config.get("Env").get("RestartSteps")
+
+
+def get_max_restart_steps(config):
+    return get_restart_steps(config) + 1

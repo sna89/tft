@@ -95,15 +95,19 @@ def get_config(dataset_name):
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
             "Filename": "SyntheticDataset.csv",
             "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
+            "TestTsDsPicklePath": os.path.join('pkl', 'synthetic_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', 'Reg'),
+            "EncoderLength": 200,
+            "PredictionLength": 7,
+            "GroupKeyword": "Series",
+            "ValueKeyword": "Value",
             "NumSeries": 10,
-            "NumSubSeries": 12,
-            "TimestepsPerSubSeries": 24*7,
-            "EncoderLength": 24*2,
-            "PredictionLength": 6,
-            "GroupKeyword": "series",
-            "ValueKeyword": "value",
-            "DatetimeAdditionalColumns": ['month', 'hour', 'day_of_month', 'day_of_week']
+            "NumSubSeries": 20,
+            "TimeStepsSubSeries": 24*7,
+            "NumCorrelatedSeries": 5,
+            "Noise": 0.5,
+            "Trend": 1,
+            "Level": 1,
         },
         "Stallion": {
             "EncoderLength": 14,
@@ -144,7 +148,7 @@ def get_config(dataset_name):
 
     train_config = {
         "Train": {
-            "BatchSize": 128,
+            "BatchSize": 32,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0
@@ -156,44 +160,44 @@ def get_config(dataset_name):
             {
                 "Synthetic": {
                     "0": {
-                        "lb": -1.2,
-                        "hb": 1.2,
+                        "lb": -5.5,
+                        "hb": 4,
                     },
                     "1": {
-                        "lb": -0.5,
-                        "hb": 0.5,
+                        "lb": -1.5,
+                        "hb": 2.75,
                     },
                     "2": {
+                        "lb": -0.8,
+                        "hb": 0.6,
+                    },
+                    "3": {
+                        "lb": -1.5,
+                        "hb": 6.5,
+                    },
+                    "4": {
+                        "lb": -4,
+                        "hb": 6,
+                    },
+                    "5": {
+                        "lb": -2,
+                        "hb": 2.75,
+                    },
+                    "6": {
+                        "lb": -2,
+                        "hb": 8.6,
+                    },
+                    "7": {
+                        "lb": -1.5,
+                        "hb": 2,
+                    },
+                    "8": {
                         "lb": -1,
                         "hb": 1.5,
                     },
-                    "3": {
-                        "lb": -2,
-                        "hb": 1,
-                    },
-                    "4": {
-                        "lb": -2,
-                        "hb": 2,
-                    },
-                    "5": {
-                        "lb": -1,
-                        "hb": 1,
-                    },
-                    "6": {
-                        "lb": -0.4,
-                        "hb": 0.6,
-                    },
-                    "7": {
-                        "lb": -0.15,
-                        "hb": 0.15,
-                    },
-                    "8": {
-                        "lb": -0.8,
-                        "hb": 0.8,
-                    },
                     "9": {
-                        "lb": -0.75,
-                        "hb": 0.6,
+                        "lb": -1.3,
+                        "hb": 0.5,
                     },
                 },
                 "Fisherman": {
@@ -237,7 +241,7 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "AlertMaxPredictionSteps": 7,
+            "AlertMaxPredictionSteps": 6,
             "AlertMinPredictionSteps": 0,
             "RestartSteps": 0,
             "Rewards": {
@@ -248,7 +252,7 @@ def get_config(dataset_name):
         },
         "THTS": {
             "NumTrials": 75,
-            "TrialLength": 6
+            "TrialLength": 8
         }
 
     }

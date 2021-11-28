@@ -2,7 +2,7 @@ from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 from utils import get_argmax_from_list, set_env_to_state
 from env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
-    get_series_state, get_series_names, get_num_iterations
+    get_group_state, get_group_names, get_num_iterations, get_last_val_time_idx
 import time
 import pandas as pd
 from typing import Dict, List
@@ -17,8 +17,8 @@ class TrialBasedHeuristicTree:
         self.config = config
         self.env = env
         self.forecasting_model = self.env.forecasting_model
-        self.group_idx_mapping = self.env.series_name_idx_mapping
-        self.group_names = get_series_names(self.group_idx_mapping)
+        self.group_id_group_name_mapping = self.env.group_id_group_name_mapping
+        self.group_names = get_group_names(self.group_id_group_name_mapping)
         self.num_actions = self.env.action_space.n
 
         self.num_trials = config.get("THTS").get("NumTrials")
@@ -29,6 +29,7 @@ class TrialBasedHeuristicTree:
 
     def run(self, test_df):
         state = self.get_initial_state()
+
         initial_node = DecisionNode(state, parent=None)
 
         current_node = deepcopy(initial_node)
@@ -45,7 +46,7 @@ class TrialBasedHeuristicTree:
 
         for iteration in range(1, num_iterations):
             start = time.time()
-            action, run_time = self._before_transition(current_node)
+            action, run_time = self._choose_action(current_node)
             action_dict = self._postprocess_action(action,
                                                    current_node,
                                                    terminal_history,
@@ -64,10 +65,10 @@ class TrialBasedHeuristicTree:
             reward_history.append(reward)
             terminal_history.append(env_terminal_list)
             restart_history.append(restart_states)
-            alert_prediction_steps_history.append({group_state.series: group_state.steps_from_alert
+            alert_prediction_steps_history.append({group_state.group: group_state.steps_from_alert
                                                    for group_state
                                                    in current_node.state.env_state})
-            restart_steps_history.append({group_state.series: group_state.restart_steps
+            restart_steps_history.append({group_state.group: group_state.restart_steps
                                           for group_state
                                           in current_node.state.env_state})
 
@@ -91,10 +92,11 @@ class TrialBasedHeuristicTree:
             print(statistics)
 
     def get_initial_state(self):
-        initial_state = self.env.reset()
+        self.env.reset()
+        initial_state = self.env.current_state
         return initial_state
 
-    def _before_transition(self, current_node: DecisionNode):
+    def _choose_action(self, current_node: DecisionNode):
         action = 0
         run_time = 0
         if not is_alertable_state(current_node, self.alert_prediction_steps, self.restart_env_iterations):
@@ -123,11 +125,11 @@ class TrialBasedHeuristicTree:
             for group_name in self.group_names:
                 is_restart = terminal_history[-1][group_name]
                 is_terminal = restart_history[-1][group_name]
-                group_state = get_series_state(current_node.state.env_state, group_name)
+                group_state = get_group_state(current_node.state.env_state, group_name)
                 if not is_restart \
                         and not is_terminal \
                         and group_state.steps_from_alert == self.env.max_steps_from_alert:
-                    group_prediction = prediction[self.group_idx_mapping[group_name]]
+                    group_prediction = prediction[self.group_id_group_name_mapping[group_name]]
                     out_of_bound, out_of_bound_idx = self.group_prediction_exceed_bounds(group_prediction, group_name)
                     if out_of_bound:
                         action_dict[group_name] = 1
@@ -140,7 +142,7 @@ class TrialBasedHeuristicTree:
     def get_encoder_time_idx_range(self, test_df: pd.DataFrame(), iteration: int):
         min_time_idx = test_df.time_idx.min()
         time_idx_range_start = min_time_idx + iteration - 1
-        time_idx_range_end = time_idx_range_start + self.env.model_enc_len + self.env.model_pred_len
+        time_idx_range_end = time_idx_range_start + self.config.get("EncoderLength") + self.config.get("PredictionLength")
         time_idx_range = list(range(time_idx_range_start, time_idx_range_end))
         return time_idx_range
 
@@ -151,7 +153,7 @@ class TrialBasedHeuristicTree:
 
     def _after_transition(self, next_state: EnvState, env_terminal_list: dict):
         for idx, group_state in enumerate(next_state.env_state):
-            env_terminal = env_terminal_list[group_state.series]
+            env_terminal = env_terminal_list[group_state.group]
             restart_steps = group_state.restart_steps
             if self.is_restart_steps(env_terminal, restart_steps):
                 next_state.env_state[idx].steps_from_alert = self.env.max_steps_from_alert
@@ -164,9 +166,8 @@ class TrialBasedHeuristicTree:
         return False
 
     def _run_trial(self, root_node: DecisionNode):
-        depth = 0
         set_env_to_state(self.env, root_node.state)
-        self._visit_decision_node(root_node, depth, False)
+        self._visit_decision_node(root_node, depth=0, terminal=False)
 
     def _visit_decision_node(self, decision_node: DecisionNode, depth: int, terminal: bool = False):
         if not terminal:
@@ -252,7 +253,7 @@ class TrialBasedHeuristicTree:
         return False
 
     def _transition_real_env(self, node: DecisionNode, test_df: pd.DataFrame(), iteration: int, action_dict: Dict):
-        val_max_time_idx = test_df.time_idx.min() + self.config.get("EncoderLength") - 1
+        val_max_time_idx = get_last_val_time_idx(self.config, test_df)
         next_sample = test_df[lambda x: x.time_idx == (val_max_time_idx + iteration)]
         next_sample.set_index(self.config.get("GroupKeyword"), inplace=True)
         next_state_values = next_sample[[self.config.get("ValueKeyword")]].to_dict(orient="dict")[

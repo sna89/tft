@@ -28,7 +28,7 @@ def get_argmax_from_list(l: List, choose_random=True):
 
 
 def set_env_to_state(env, state):
-    env.current_state = state
+    env._current_state = state
 
 
 def get_model_from_trainer(trainer, model_name):
