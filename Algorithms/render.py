@@ -1,10 +1,9 @@
 import plotly.graph_objects as go
 import pandas as pd
 from typing import List, Dict
-
-
-def get_min_test_time_idx(config, test_df):
-    return test_df.time_idx.min() + config.get("EncoderLength") - 1
+import os
+from config import PLOT
+from env_thts_common import get_last_val_time_idx
 
 
 def add_group_y_value_plot(config, fig, test_df, group_name, time_idx_list):
@@ -72,7 +71,7 @@ def render(config,
            alert_prediction_steps_history: List[Dict],
            restart_steps_history: List[Dict]):
 
-    min_test_time_idx = get_min_test_time_idx(config, test_df)
+    min_test_time_idx = get_last_val_time_idx(config, test_df)
     time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
 
     for group_name in group_names:
@@ -102,4 +101,4 @@ def render(config,
 
         fig.update_xaxes(title_text="<b>time_idx</b>")
         fig.update_yaxes(title_text="<b>Actual</b>")
-        fig.write_html('render_synthetic_{}.html'.format(group_name))
+        fig.write_html(os.path.join(PLOT, 'render_synthetic_{}.html'.format(group_name)))

@@ -47,9 +47,11 @@ class DataBuilder(ABC):
         raise NotImplementedError
 
     def split_train_val_test(self, data: pd.DataFrame()):
-        training_max_idx = int(data.time_idx.max() * self.train_ratio)
+        num_samples = (data.time_idx.max() + 1)
 
-        test_start_idx = int(data.time_idx.max() * (self.train_ratio + self.val_ratio)) - (
+        training_max_idx = int(num_samples * self.train_ratio)
+
+        test_start_idx = int(num_samples * (self.train_ratio + self.val_ratio)) - (
                 self.enc_length + self.prediction_length)
         test_df = data[lambda x: x.time_idx > test_start_idx]
 

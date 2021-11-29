@@ -1,6 +1,6 @@
 import pandas as pd
 from env_thts_common import get_num_iterations, get_group_names, \
-     calc_reward, is_state_terminal
+     calc_reward, is_state_terminal, get_steps_from_alert, get_max_restart_steps
 import os
 import numpy as np
 import time
@@ -17,8 +17,8 @@ class TrajectorySample:
         self.config = config
         self.enc_len = self.config.get("EncoderLength")
         self.pred_len = self.config.get("PredictionLength")
-        self.max_steps_from_alert = config.get("Env").get("AlertMaxPredictionSteps") + 1
-        self.max_restart_steps = config.get("Env").get("RestartSteps") + 1
+        self.steps_from_alert = get_steps_from_alert(self.config)
+        self.max_restart_steps = get_max_restart_steps(self.config)
         self.deepar_model = deepar_model
         self.val_df = val_df
         self.test_df = test_df
@@ -40,7 +40,7 @@ class TrajectorySample:
         reward_history = []
         terminal_history = [{group_name: False for group_name in self.group_names}]
         restart_history = [{group_name: False for group_name in self.group_names}]
-        alert_prediction_steps_history = [{group_name: self.max_steps_from_alert for group_name in self.group_names}]
+        alert_prediction_steps_history = [{group_name: self.steps_from_alert for group_name in self.group_names}]
         restart_steps_history = [{group_name: self.max_restart_steps for group_name in self.group_names}]
 
         statistics = init_statistics(self.group_names)
@@ -123,22 +123,22 @@ class TrajectorySample:
                                                  good_alert=False,
                                                  false_alert=False,
                                                  missed_alert=True,
-                                                 current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
-                                                 max_steps_from_alert=self.max_steps_from_alert)
+                                                 current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
+                                                 steps_from_alert=self.steps_from_alert)
                         elif action == 1 and out_of_bound:
                             reward = calc_reward(self.config,
                                                  good_alert=True,
                                                  false_alert=False,
                                                  missed_alert=False,
-                                                 current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
-                                                 max_steps_from_alert=self.max_steps_from_alert)
+                                                 current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
+                                                 steps_from_alert=self.steps_from_alert)
                         elif action == 1 and not out_of_bound:
                             reward = calc_reward(self.config,
                                                  good_alert=False,
                                                  false_alert=True,
                                                  missed_alert=False,
-                                                 current_steps_from_alert=self.max_steps_from_alert - out_of_bound_idx,
-                                                 max_steps_from_alert=self.max_steps_from_alert)
+                                                 current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
+                                                 steps_from_alert=self.steps_from_alert)
                         score += reward
                     group_action_scores.append(score)
             else:
@@ -160,7 +160,7 @@ class TrajectorySample:
         for group_name in self.group_names:
             if not previous_state_terminal_dict[group_name] \
                     and not previous_state_restart_dict[group_name] \
-                    and previous_state_alert_prediction_steps_dict[group_name] == self.max_steps_from_alert:
+                    and previous_state_alert_prediction_steps_dict[group_name] == self.steps_from_alert:
                 feasible_alert_groups.append(group_name)
         return feasible_alert_groups
 
@@ -195,12 +195,12 @@ class TrajectorySample:
                 next_state_group_terminal_mapping[group_name] = False
                 next_state_group_restart_mapping[group_name] = True
                 next_state_group_restart_steps_mapping[group_name] = group_restart_steps - 1
-                next_state_group_steps_from_alert_mapping[group_name] = self.max_steps_from_alert
+                next_state_group_steps_from_alert_mapping[group_name] = self.steps_from_alert
 
             elif (group_restart and group_restart_steps == 1) or group_steps_from_alert == 1:
                 next_state_group_restart_mapping[group_name] = False
                 next_state_group_restart_steps_mapping[group_name] = self.max_restart_steps
-                next_state_group_steps_from_alert_mapping[group_name] = self.max_steps_from_alert
+                next_state_group_steps_from_alert_mapping[group_name] = self.steps_from_alert
 
                 if group_steps_from_alert == 1:
                     if not group_next_state_terminal:
@@ -209,16 +209,16 @@ class TrajectorySample:
                                               false_alert=True,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              max_steps_from_alert=self.max_steps_from_alert)
+                                              steps_from_alert=self.steps_from_alert)
                     else:
                         reward += calc_reward(config=self.config,
                                               good_alert=True,
                                               false_alert=False,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              max_steps_from_alert=self.max_steps_from_alert)
+                                              steps_from_alert=self.steps_from_alert)
 
-            elif 1 < group_steps_from_alert < self.max_steps_from_alert:
+            elif 1 < group_steps_from_alert < self.steps_from_alert:
                 next_state_group_restart_mapping[group_name] = False
                 next_state_group_restart_steps_mapping[group_name] = self.max_restart_steps
                 next_state_group_steps_from_alert_mapping[group_name] = group_steps_from_alert - 1
@@ -229,13 +229,13 @@ class TrajectorySample:
                                           false_alert=False,
                                           missed_alert=False,
                                           current_steps_from_alert=group_steps_from_alert,
-                                          max_steps_from_alert=self.max_steps_from_alert)
+                                          steps_from_alert=self.steps_from_alert)
 
             else:
                 if action == 0:
                     next_state_group_restart_mapping[group_name] = False
                     next_state_group_restart_steps_mapping[group_name] = self.max_restart_steps
-                    next_state_group_steps_from_alert_mapping[group_name] = self.max_steps_from_alert
+                    next_state_group_steps_from_alert_mapping[group_name] = self.steps_from_alert
 
                     if group_next_state_terminal:
                         reward += calc_reward(config=self.config,
@@ -243,7 +243,7 @@ class TrajectorySample:
                                               false_alert=False,
                                               missed_alert=True,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              max_steps_from_alert=self.max_steps_from_alert)
+                                              steps_from_alert=self.steps_from_alert)
 
                 elif action == 1:
                     next_state_group_restart_mapping[group_name] = False
@@ -256,7 +256,7 @@ class TrajectorySample:
                                               false_alert=False,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              max_steps_from_alert=self.max_steps_from_alert)
+                                              steps_from_alert=self.steps_from_alert)
 
             reward_group_mapping[group_name] = reward
 
@@ -268,7 +268,7 @@ class TrajectorySample:
 
     def _get_out_of_bound_list_tuple(self, prediction, group_name):
         group_prediction_trajectories_samples = \
-            prediction[self.group_idx_mapping[group_name]][:self.max_steps_from_alert].T
+            prediction[self.group_idx_mapping[group_name]][:self.steps_from_alert].T
         lb = self.rollout_policy[group_name]['lb']
         ub = self.rollout_policy[group_name]['ub']
         out_of_bound_list_tuple = list(map(lambda x: is_group_prediction_out_of_bound(

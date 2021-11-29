@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict, List
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics
-from data_utils import get_group_lower_and_upper_bounds, is_group_prediction_out_of_bound
+from data_utils import get_group_lower_and_upper_bounds, is_group_prediction_out_of_bound, reverse_key_value_mapping
 
 
 class TrialBasedHeuristicTree:
@@ -23,22 +23,20 @@ class TrialBasedHeuristicTree:
 
         self.num_trials = config.get("THTS").get("NumTrials")
         self.trial_length = config.get("THTS").get("TrialLength")
-        self.alert_prediction_steps = self.env.max_steps_from_alert
+        self.alert_prediction_steps = self.env.steps_from_alert
         self.consider_trial_length = True
-        self.restart_env_iterations = self.env.max_restart_steps
+        self.restart_env_iterations = self.env.restart_steps
 
     def run(self, test_df):
         state = self.get_initial_state()
-
         initial_node = DecisionNode(state, parent=None)
-
         current_node = deepcopy(initial_node)
 
         action_history = []
         reward_history = []
         terminal_history = [{group_name: False for group_name in self.group_names}]
         restart_history = [{group_name: False for group_name in self.group_names}]
-        alert_prediction_steps_history = []
+        steps_from_alert_history = []
         restart_steps_history = []
 
         num_iterations = get_num_iterations(test_df, self.config.get("EncoderLength"))
@@ -47,27 +45,28 @@ class TrialBasedHeuristicTree:
         for iteration in range(1, num_iterations):
             start = time.time()
             action, run_time = self._choose_action(current_node)
-            action_dict = self._postprocess_action(action,
-                                                   current_node,
-                                                   terminal_history,
-                                                   restart_history,
-                                                   test_df,
-                                                   iteration)
+            group_action_mapping = self._postprocess_action(action,
+                                                            current_node,
+                                                            terminal_history,
+                                                            restart_history,
+                                                            test_df,
+                                                            iteration)
 
-            next_state, env_terminal_list, restart_states, reward = self._transition_real_env(current_node,
-                                                                                              test_df,
-                                                                                              iteration,
-                                                                                              action_dict)
+            next_state, env_terminal_list, restart_states, group_reward_mapping = self._transition_real_env(
+                current_node,
+                test_df,
+                iteration,
+                group_action_mapping)
 
             next_state = self._after_transition(next_state, env_terminal_list)
 
-            action_history.append(action_dict)
-            reward_history.append(reward)
+            action_history.append(group_action_mapping)
+            reward_history.append(group_reward_mapping)
             terminal_history.append(env_terminal_list)
             restart_history.append(restart_states)
-            alert_prediction_steps_history.append({group_state.group: group_state.steps_from_alert
-                                                   for group_state
-                                                   in current_node.state.env_state})
+            steps_from_alert_history.append({group_state.group: group_state.steps_from_alert
+                                             for group_state
+                                             in current_node.state.env_state})
             restart_steps_history.append({group_state.group: group_state.restart_steps
                                           for group_state
                                           in current_node.state.env_state})
@@ -75,7 +74,11 @@ class TrialBasedHeuristicTree:
             end = time.time()
             run_time = end - start
 
-            statistics = update_statistics(self.config, self.group_names, statistics, reward, action_dict)
+            statistics = update_statistics(self.config,
+                                           self.group_names,
+                                           statistics,
+                                           group_reward_mapping,
+                                           steps_from_alert_history[-1])
 
             render(self.config,
                    self.group_names,
@@ -85,7 +88,7 @@ class TrialBasedHeuristicTree:
                    reward_history,
                    terminal_history,
                    restart_history,
-                   alert_prediction_steps_history,
+                   steps_from_alert_history,
                    restart_steps_history)
 
             current_node = DecisionNode(next_state, parent=current_node, terminal=False)
@@ -128,8 +131,9 @@ class TrialBasedHeuristicTree:
                 group_state = get_group_state(current_node.state.env_state, group_name)
                 if not is_restart \
                         and not is_terminal \
-                        and group_state.steps_from_alert == self.env.max_steps_from_alert:
-                    group_prediction = prediction[self.group_id_group_name_mapping[group_name]]
+                        and group_state.steps_from_alert == self.env.steps_from_alert:
+                    group_name_group_id_mapping = reverse_key_value_mapping(self.group_id_group_name_mapping)
+                    group_prediction = prediction[group_name_group_id_mapping[group_name]]
                     out_of_bound, out_of_bound_idx = self.group_prediction_exceed_bounds(group_prediction, group_name)
                     if out_of_bound:
                         action_dict[group_name] = 1
@@ -142,7 +146,8 @@ class TrialBasedHeuristicTree:
     def get_encoder_time_idx_range(self, test_df: pd.DataFrame(), iteration: int):
         min_time_idx = test_df.time_idx.min()
         time_idx_range_start = min_time_idx + iteration - 1
-        time_idx_range_end = time_idx_range_start + self.config.get("EncoderLength") + self.config.get("PredictionLength")
+        time_idx_range_end = time_idx_range_start + self.config.get("EncoderLength") + self.config.get(
+            "PredictionLength")
         time_idx_range = list(range(time_idx_range_start, time_idx_range_end))
         return time_idx_range
 
@@ -151,17 +156,17 @@ class TrialBasedHeuristicTree:
         out_of_bound, out_of_bound_idx = is_group_prediction_out_of_bound(group_prediction, lb, ub)
         return out_of_bound, out_of_bound_idx
 
-    def _after_transition(self, next_state: EnvState, env_terminal_list: dict):
+    def _after_transition(self, next_state: EnvState, is_terminal_list: dict):
         for idx, group_state in enumerate(next_state.env_state):
-            env_terminal = env_terminal_list[group_state.group]
-            restart_steps = group_state.restart_steps
-            if self.is_restart_steps(env_terminal, restart_steps):
-                next_state.env_state[idx].steps_from_alert = self.env.max_steps_from_alert
+            is_group_current_terminal = is_terminal_list[group_state.group]
+            group_restart_steps = group_state.restart_steps
+            if self.is_group_restart(is_group_current_terminal, group_restart_steps):
+                next_state.env_state[idx].steps_from_alert = self.env.steps_from_alert
 
         return next_state
 
-    def is_restart_steps(self, env_terminal, restart_env_iterations):
-        if env_terminal or restart_env_iterations < self.restart_env_iterations:
+    def is_group_restart(self, is_group_current_terminal, group_restart_steps):
+        if is_group_current_terminal or group_restart_steps < self.restart_env_iterations:
             return True
         return False
 
@@ -265,8 +270,8 @@ class TrialBasedHeuristicTree:
                                                                                current_state,
                                                                                self.group_names,
                                                                                next_state_values,
-                                                                               self.env.max_steps_from_alert,
-                                                                               self.env.max_restart_steps,
+                                                                               self.env.steps_from_alert,
+                                                                               self.env.restart_steps,
                                                                                action_dict)
 
         reward = get_reward(self.env_name,

@@ -5,11 +5,11 @@ import pandas as pd
 from datetime import datetime
 import datetime
 from env_thts_common import get_reward, build_next_state, EnvState, State, get_last_val_time_idx, get_last_val_date, \
-    get_steps_from_alert, get_max_steps_from_alert, get_min_steps_from_alert, get_restart_steps, get_max_restart_steps, \
+    get_steps_from_alert, get_restart_steps, get_max_restart_steps, \
     get_group_names
 
 from config import DATETIME_COLUMN
-from data_utils import add_dt_columns, reverse_key_value_mapping, get_group_id_group_name_mapping
+from data_utils import add_dt_columns, get_group_id_group_name_mapping
 from Models.trainer import get_prediction_mode
 
 
@@ -29,11 +29,9 @@ class AdEnv(gym.Env):
         self.last_val_date = get_last_val_date(self.test_df, self.last_val_time_idx)
         self.init_prediction_df = self.test_df[self.test_df.time_idx <= self.last_val_time_idx]
 
-        self.alert_prediction_steps = get_steps_from_alert(self.config)
-        self.min_steps_from_alert = get_min_steps_from_alert(self.config)
-        self.max_steps_from_alert = get_max_steps_from_alert(self.config)
+        self.steps_from_alert = get_steps_from_alert(self.config)
         self.restart_steps = get_restart_steps(self.config)
-        self.max_restart_steps = get_max_restart_steps(self.config)
+        self.restart_steps = get_max_restart_steps(self.config)
 
         self.num_series = self._get_num_series()
         self.num_quantiles = self._get_num_quantiles()
@@ -45,9 +43,9 @@ class AdEnv(gym.Env):
 
     def step(self, action: int):
         assert action in [0, 1], "Action must be part of action space"
-        assert (all(series_state.steps_from_alert < self.max_steps_from_alert
+        assert (all(series_state.steps_from_alert < self.steps_from_alert
                     for series_state in self.current_state.env_state)
-                and action == 0) or any((series_state.steps_from_alert == self.max_steps_from_alert
+                and action == 0) or any((series_state.steps_from_alert == self.steps_from_alert
                                          for series_state in self.current_state.env_state))
 
         prediction = self._predict_next_state()
@@ -60,8 +58,8 @@ class AdEnv(gym.Env):
                                                           self.current_state,
                                                           group_names,
                                                           prediction,
-                                                          self.max_steps_from_alert,
-                                                          self.max_restart_steps,
+                                                          self.steps_from_alert,
+                                                          self.restart_steps,
                                                           action)
 
         reward = get_reward(self.env_name,
@@ -84,8 +82,8 @@ class AdEnv(gym.Env):
         last_sample_df = self.test_df[self.test_df.time_idx == self.last_val_time_idx]
         for idx, sample in last_sample_df.iterrows():
             state = State(sample[self.config.get("GroupKeyword")],
-                          self.max_steps_from_alert,
-                          self.max_restart_steps,
+                          self.steps_from_alert,
+                          self.restart_steps,
                           sample[self.config.get("ValueKeyword")],
                           [])
             self.current_state.env_state.append(state)

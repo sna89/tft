@@ -103,7 +103,7 @@ def get_config(dataset_name):
             "ValueKeyword": "Value",
             "NumSeries": 10,
             "NumSubSeries": 20,
-            "TimeStepsSubSeries": 24*7,
+            "TimeStepsSubSeries": 24 * 7,
             "NumCorrelatedSeries": 5,
             "Noise": 0.5,
             "Trend": 1,
@@ -241,18 +241,17 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "AlertMaxPredictionSteps": 6,
-            "AlertMinPredictionSteps": 0,
+            "AlertMaxPredictionSteps": 2,
             "RestartSteps": 0,
             "Rewards": {
-                "MissedAlert": -100,
+                "MissedAlert": -1000,
                 "FalseAlert": -100,
                 "GoodAlert": 10,
             }
         },
         "THTS": {
-            "NumTrials": 75,
-            "TrialLength": 8
+            "NumTrials": 10,
+            "TrialLength": 4
         }
 
     }
