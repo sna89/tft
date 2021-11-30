@@ -30,7 +30,6 @@ class AdEnv(gym.Env):
         self.init_prediction_df = self.test_df[self.test_df.time_idx <= self.last_val_time_idx]
 
         self.steps_from_alert = get_steps_from_alert(self.config)
-        self.restart_steps = get_restart_steps(self.config)
         self.restart_steps = get_max_restart_steps(self.config)
 
         self.num_series = self._get_num_series()
@@ -72,7 +71,7 @@ class AdEnv(gym.Env):
         return next_state, reward
 
     def _sample_from_prediction(self, model_prediction):
-        quantile_idx_list = np.random.randint(low=0, high=self.num_quantiles, size=self.num_series)
+        quantile_idx_list = np.random.randint(low=1, high=self.num_quantiles - 1, size=self.num_series)
         prediction = [quantile_prediction[0][quantile_idx_list[idx]] for idx, quantile_prediction in
                       enumerate(model_prediction)]
         return prediction

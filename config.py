@@ -97,7 +97,7 @@ def get_config(dataset_name):
             "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
             "TestTsDsPicklePath": os.path.join('pkl', 'synthetic_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', 'Reg'),
-            "EncoderLength": 200,
+            "EncoderLength": 400,
             "PredictionLength": 7,
             "GroupKeyword": "Series",
             "ValueKeyword": "Value",
@@ -160,44 +160,44 @@ def get_config(dataset_name):
             {
                 "Synthetic": {
                     "0": {
-                        "lb": -5.5,
-                        "hb": 4,
+                        "lb": -2.9,
+                        "hb": 3.6,
                     },
                     "1": {
-                        "lb": -1.5,
-                        "hb": 2.75,
+                        "lb": -1.8,
+                        "hb": 1.8,
                     },
                     "2": {
-                        "lb": -0.8,
-                        "hb": 0.6,
+                        "lb": -3,
+                        "hb": 3.5,
                     },
                     "3": {
-                        "lb": -1.5,
-                        "hb": 6.5,
+                        "lb": -2,
+                        "hb": 11.5,
                     },
                     "4": {
-                        "lb": -4,
-                        "hb": 6,
+                        "lb": -2,
+                        "hb": 3.9,
                     },
                     "5": {
-                        "lb": -2,
-                        "hb": 2.75,
+                        "lb": -4.8,
+                        "hb": 3.5,
                     },
                     "6": {
                         "lb": -2,
-                        "hb": 8.6,
+                        "hb": 8.5,
                     },
                     "7": {
-                        "lb": -1.5,
-                        "hb": 2,
+                        "lb": -12.8,
+                        "hb": 4,
                     },
                     "8": {
-                        "lb": -1,
-                        "hb": 1.5,
+                        "lb": -1.5,
+                        "hb": 1.1,
                     },
                     "9": {
-                        "lb": -1.3,
-                        "hb": 0.5,
+                        "lb": -1,
+                        "hb": 2.2,
                     },
                 },
                 "Fisherman": {
@@ -241,17 +241,17 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "AlertMaxPredictionSteps": 2,
+            "AlertMaxPredictionSteps": 4,
             "RestartSteps": 0,
             "Rewards": {
                 "MissedAlert": -1000,
                 "FalseAlert": -100,
-                "GoodAlert": 10,
+                "GoodAlert": 50,
             }
         },
         "THTS": {
-            "NumTrials": 10,
-            "TrialLength": 4
+            "NumTrials": 500,
+            "TrialLength": 6
         }
 
     }

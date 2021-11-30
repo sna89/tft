@@ -27,7 +27,7 @@ def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path):
 
 
 def create_tft_model(training_data: TimeSeriesDataSet, study=None):
-    loss = QuantileLoss([0.01, 0.025, 0.1, 0.5, 0.9, 0.975, 0.99])
+    loss = QuantileLoss([0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99])
     output_size = 7
 
     if study:
