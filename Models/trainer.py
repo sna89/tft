@@ -100,7 +100,7 @@ def fit_regression_model(config, train_ds, val_ds, model_name, study=None, type_
 
 
 def create_trainer(study=None, gradient_clip_val=0.1):
-    early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=1e-4, patience=3, verbose=True, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=1e-3, patience=3, verbose=True, mode="min")
     logger = TensorBoardLogger("tb_logs", name="my_model")
     lr_logger = LearningRateMonitor(logging_interval='step')  # log the learning rate
 

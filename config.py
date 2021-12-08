@@ -2,13 +2,22 @@ import os
 import multiprocessing
 import numpy as np
 
+OBSERVED_KEYWORD = "Observed"
+NOT_OBSERVED_KEYWORD = "NotObserved"
+
+OBSERVED_LB_KEYWORD = "ObservedLB"
+OBSERVED_UB_KEYWORD = "ObservedUB"
+
+NOT_OBSERVED_LB_KEYWORD = "NotObservedLB"
+NOT_OBSERVED_UB_KEYWORD = "NotObservedUB"
+
 KEY_DELIMITER = '_'
 DATETIME_COLUMN = "Date"
 
 DATA = "Data"
 DATA_BASE_FOLDER = os.path.join(DATA)
 
-PLOT = "/tmp/noam/plots"
+PLOT = "Plots"
 PLOT = os.path.join(PLOT)
 
 STUDY = "Study"
@@ -101,13 +110,8 @@ def get_config(dataset_name):
             "PredictionLength": 7,
             "GroupKeyword": "Series",
             "ValueKeyword": "Value",
-            "NumSeries": 10,
-            "NumSubSeries": 20,
-            "TimeStepsSubSeries": 24 * 7,
-            "NumCorrelatedSeries": 5,
-            "Noise": 0.5,
-            "Trend": 1,
-            "Level": 1,
+            "ObservedBoundKeyword": "ObservedBound",
+            "UnobservedBoundKeyword": "UnObservedBound",
         },
         "Stallion": {
             "EncoderLength": 14,
@@ -116,11 +120,12 @@ def get_config(dataset_name):
         "Straus": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
             "TestDataFramePicklePath": os.path.join('pkl', 'straus_test_df.pkl'),
+            "TestTsDsPicklePath": os.path.join('pkl', 'straus_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', 'Reg'),
-            "ProcessedDataPath": os.path.join('pkl', 'straus_processed_df.pkl'),
             "GroupKeyword": "key",
             "GroupColumns": ['PartId', 'OrderStepId', 'QmpId'],
-            "ValueKeyword": "ActualValue",
+            # "ValueKeyword": "ActualValue",
+            "ValueKeyword": ["ShellIndex", "WrapIndex"],
             "ExceptionKeyword": "is_stoppage",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "EncoderLength": 360,
@@ -241,6 +246,7 @@ def get_config(dataset_name):
 
             },
         "Env": {
+            "ConsecutiveExceptions": 3,
             "AlertMaxPredictionSteps": 4,
             "RestartSteps": 0,
             "Rewards": {

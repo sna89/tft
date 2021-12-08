@@ -26,7 +26,7 @@ def evaluate_regression(config, ts_ds, model):
 
     mse = mean_squared_error(actuals, predictions)
     mae = mean_absolute_error(actuals, predictions)
-    print("MSE: {}, MAE: {}".format(mse, mae))
+    print("MAE: {} MSE: {}".format(mae, mse))
 
 
 def evaluate_regression_groups(config, ts_ds, actual, predictions):
@@ -41,7 +41,7 @@ def evaluate_regression_groups(config, ts_ds, actual, predictions):
 def evaluate_regression_group(actual, predictions, group_name, group_indices):
     group_mse = mean_squared_error(actual[group_indices], predictions[group_indices])
     group_mae = mean_absolute_error(actual[group_indices], predictions[group_indices])
-    print("Group: {}, MSE: {}, MAE: {}".format(group_name, group_mse, group_mae))
+    print("Group: {}, MAE: {}, MSE: {}".format(group_name, group_mae, group_mse))
 
 
 def evaluate_classification(config, ts_ds, model):

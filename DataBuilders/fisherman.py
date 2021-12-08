@@ -2,7 +2,7 @@ import datetime
 from datetime import timedelta
 import os
 import pandas as pd
-from data_utils import filter_df_by_date, add_dt_columns, assign_time_idx, add_future_exceed
+from data_utils import filter_df_by_date, add_dt_columns, assign_time_idx, create_bounds_labels
 from pytorch_forecasting import TimeSeriesDataSet, NaNLabelEncoder
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN
@@ -52,7 +52,7 @@ class FishermanDataBuilder(DataBuilder):
         data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
         data.reset_index(inplace=True, drop=True)
         data = assign_time_idx(data, DATETIME_COLUMN)
-        data = add_future_exceed(self.config, data, sensor)
+        data = create_bounds_labels(self.config, data, sensor)
         return data
 
     def define_regression_ts_ds(self, df):

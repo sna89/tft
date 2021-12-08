@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from config import DATETIME_COLUMN
+from config import DATETIME_COLUMN, OBSERVED_KEYWORD, NOT_OBSERVED_KEYWORD
 from typing import List, Union, Dict
 import os
 import torch
@@ -82,24 +82,56 @@ def assign_time_idx(df, dt_col):
     return df
 
 
-def get_group_lower_and_upper_bounds(config, group_name):
-    bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name)
+def get_group_lower_and_upper_bounds(config, group_name, is_observed=True):
+    if is_observed:
+        bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(OBSERVED_KEYWORD)
+    else:
+        bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(NOT_OBSERVED_KEYWORD)
     lb, ub = bounds.values()
     return lb, ub
 
 
-def add_future_exceed(config, data, group):
-    prediction_len = config.get("PredictionLength")
-    lb, ub = get_group_lower_and_upper_bounds(config, group)
-    exception_col = config.get("ExceptionKeyword")
-    data[exception_col] = is_future_exceed(config, data, prediction_len, lb, ub)
-    data[exception_col] = data[exception_col].astype(int).astype(str).astype("category")
+def create_bounds_labels(config, data):
+    observed_bound_col = config.get("ObservedBoundKeyword")
+    unobserved_bound_col = config.get("UnobservedBoundKeyword")
+
+    data = add_observed_bound_column(observed_bound_col, data)
+    data = add_unobserved_bound_column(unobserved_bound_col, data)
+
+    groups = pd.unique(data[config.get("GroupKeyword")])
+    for group in groups:
+        group_data = data[data[config.get("GroupKeyword")] == group]
+        horizon = config.get("PredictionLength")
+
+        data.loc[group_data.index, observed_bound_col] = add_bounds_label(config, group_data, group, horizon, is_observed=True)
+        data.loc[group_data.index, unobserved_bound_col] = add_bounds_label(config, group_data, group, horizon, is_observed=False)
+
+    data[observed_bound_col] = data[observed_bound_col].astype(int).astype(str).astype("category")
+    data[unobserved_bound_col] = data[unobserved_bound_col].astype(int).astype(str).astype("category")
+
     return data
 
 
-def is_future_exceed(config, data, prediction_len, lb, ub):
-    shifted_values = data.shift(-prediction_len)[config.get("ValueKeyword")]
-    return (shifted_values < lb) | (shifted_values > ub)
+def add_observed_bound_column(observed_bound_col, data):
+    data[observed_bound_col] = False
+    return data
+
+
+def add_unobserved_bound_column(unobserved_bound_col, data):
+    data[unobserved_bound_col] = False
+    return data
+
+
+def add_bounds_label(config, data, group, horizon, is_observed=True):
+    if is_observed:
+        lb, ub = get_group_lower_and_upper_bounds(config, group, is_observed=True)
+    else:
+        lb, ub = get_group_lower_and_upper_bounds(config, group, is_observed=False)
+    shifted_values = data.shift(-horizon)[config.get("ValueKeyword")]
+    data["Exception"] = (shifted_values < lb) | (shifted_values > ub)
+    data["ConsecutiveExceptions"] = data["Exception"].rolling(min_periods=1,
+                                                              window=config.get("Env").get("ConsecutiveExceptions")).sum()
+    return data["ConsecutiveExceptions"] == config.get("Env").get("ConsecutiveExceptions")
 
 
 def get_group_id_group_name_mapping(config, ts_ds):

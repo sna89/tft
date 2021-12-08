@@ -4,7 +4,7 @@ import numpy as np
 import os
 import pandas as pd
 from data_utils import add_dt_columns, assign_time_idx
-from pytorch_forecasting import TimeSeriesDataSet
+from pytorch_forecasting import TimeSeriesDataSet, MultiNormalizer
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN, KEY_DELIMITER
 from utils import save_to_pickle
@@ -15,6 +15,7 @@ BOUNDS_PARAMETER_NAME_LIST = ['MinValue', 'MinWarnValue', 'MaxWarnValue', 'MaxVa
 PLANT_MODEL_ID = 2629
 # MAX_ORDER_STEP_ID = 430000
 MIN_DATETIME = datetime.datetime(day=1, month=4, year=2021)
+MAX_DATETIME = datetime.datetime(day=1, month=7, year=2021)
 QMP_FILTER_LIST = [6, 9, 11, 14, 19, 26, 53]
 UNPLANNED_STOPPAGE_TYPE_ID = 4
 MIN_STOPPAGE_DURATION = timedelta(minutes=15)
@@ -26,26 +27,25 @@ class StrausDataBuilder(DataBuilder):
         self.bounds = {}
 
     def build_data(self):
-        qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df = self.read_files()
+        qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df, temp_index_df = self.read_files()
         qmp_order_log_df = self.join_qmp_order_log_data(qmp_log_df, order_log_df)
         stoppage_log_event_df = self.join_stoppage_log_event_data(stoppage_log_df, stoppage_event_df)
         stoppage_log_event_df = self.process_joined_stoppage_data(stoppage_log_event_df)
         qmp_order_log_df = self.add_stoppage_ind_to_qmp_order_log_data(qmp_order_log_df, stoppage_log_event_df)
+        qmp_order_log_df = self.add_temp_index_to_qmp_order_log_data(qmp_order_log_df, temp_index_df)
         self._create_key_column(qmp_order_log_df)
         for group_col in self.config.get("GroupColumns") + [KEY_COLUMN]:
             qmp_order_log_df[group_col] = qmp_order_log_df[group_col].astype(str).astype("category")
         # self._get_bounds(filename, data)
-        qmp_order_log_df.drop_duplicates(subset=["QmpId", "PartId", "OrderStepId", 'TimeStmp'], inplace=True)
-        qmp_order_log_df = assign_time_idx(qmp_order_log_df, "TimeStmp")
+        qmp_order_log_df.drop_duplicates(subset=["QmpId", "PartId", "OrderStepId", DATETIME_COLUMN], inplace=True)
         return qmp_order_log_df
 
     def preprocess(self, data):
-        data = self._add_dt_column(data)
-        data = self._sort_data(data)
+        data = assign_time_idx(data, DATETIME_COLUMN)
         data = add_dt_columns(data, self.config.get("DatetimeAdditionalColumns"))
-        data.sort_values(by=[KEY_COLUMN, DATETIME_COLUMN], ascending=True, inplace=True)
+        data.sort_values(by=[DATETIME_COLUMN, KEY_COLUMN], ascending=True, inplace=True)
         data.reset_index(drop=True, inplace=True)
-        save_to_pickle(data, self.config.get("ProcessedDataPath"))
+        # save_to_pickle(data, self.config.get("ProcessedDataPath"))
         return data
 
     def read_files(self):
@@ -55,6 +55,7 @@ class StrausDataBuilder(DataBuilder):
         order_log_data_list = []
         stoppage_log_data_list = []
         stoppage_event_data_list = []
+        temp_index_df = pd.DataFrame()
 
         for filename in filenames:
             file_path = os.path.join(self.config.get("Path"), filename)
@@ -70,22 +71,45 @@ class StrausDataBuilder(DataBuilder):
             elif 'StoppageEvent_data' in filename:
                 df = self.read_stoppage_event_file(file_path)
                 stoppage_event_data_list.append(df)
+            elif "TempIndex" in filename:
+                temp_index_df = self.read_temp_index_file(file_path)
 
         qmp_log_df = pd.concat(qmp_log_data_list, axis=0)
         order_log_df = pd.concat(order_log_data_list, axis=0)
         stoppage_log_df = pd.concat(stoppage_log_data_list, axis=0)
         stoppage_event_df = pd.concat(stoppage_event_data_list, axis=0)
 
-        return qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df
+        return qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df, temp_index_df
+
+    @staticmethod
+    def read_temp_index_file(file_path):
+        df = pd.read_csv(file_path, names=[DATETIME_COLUMN, "Time", "ShellIndex", "WrapIndex"], header=0)
+
+        df["ShellIndex"] = pd.to_numeric(df["ShellIndex"].replace("-", np.nan))
+        df["WrapIndex"] = pd.to_numeric(df["WrapIndex"].replace("-", np.nan))
+
+        df[DATETIME_COLUMN] = df[DATETIME_COLUMN].fillna(method="ffill")
+        df[DATETIME_COLUMN] = df[DATETIME_COLUMN].str.replace("202$", "2021")
+
+        df["Time"] = df["Time"].str.replace("בין ", "")
+        df["Time"] = df["Time"].str.replace("[-]+.*", ":00")
+        df[DATETIME_COLUMN] = pd.to_datetime(df[DATETIME_COLUMN] + ' ' + df["Time"], dayfirst=True)
+        df = StrausDataBuilder.filter_df_by_dt(df, DATETIME_COLUMN)
+        df.sort_values(by=[DATETIME_COLUMN], ascending=True, inplace=True)
+
+        df.drop(columns=["Time"], axis=1, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        return df
 
     @staticmethod
     def read_qmp_log_file(file_path):
         raw_df = pd.read_csv(file_path)
         df = StrausDataBuilder.filter_by_plant_model_id(raw_df)
         df.drop(columns=['PlantModelId', 'SpValue'], inplace=True)
-        df['TimeStmp'] = pd.to_datetime(df['TimeStmp'])
+        df[DATETIME_COLUMN] = pd.to_datetime(df['TimeStmp'])
+        df = df.drop(columns=['TimeStmp'], axis=1)
         df = StrausDataBuilder.filter_by_qmp(df)
-        df = StrausDataBuilder.filter_qmp_df_by_dt(df)
+        df = StrausDataBuilder.filter_df_by_dt(df, DATETIME_COLUMN)
         # df = StrausDataBuilder.agg_mean_qmp_by_qmp_order_step(df)
         return df
 
@@ -95,8 +119,8 @@ class StrausDataBuilder(DataBuilder):
         return df
 
     @staticmethod
-    def filter_qmp_df_by_dt(df):
-        df = df[df.TimeStmp >= MIN_DATETIME]
+    def filter_df_by_dt(df, time_column, min_dt=MIN_DATETIME, max_dt=MAX_DATETIME):
+        df = df[(df[time_column] >= min_dt) & (df[time_column] <= max_dt)]
         return df
 
     @staticmethod
@@ -131,7 +155,7 @@ class StrausDataBuilder(DataBuilder):
         df.drop(columns=['PlantModelId', 'BlamePlantModelId'], inplace=True)
         df['ActualStrTime'] = pd.to_datetime(df['ActualStrTime'])
         df['ActualEndTime'] = pd.to_datetime(df['ActualEndTime'])
-        df = df[df.ActualStrTime >= MIN_DATETIME]
+        df = StrausDataBuilder.filter_df_by_dt(df, 'ActualStrTime')
         return df
 
     @staticmethod
@@ -142,7 +166,7 @@ class StrausDataBuilder(DataBuilder):
                 inplace=True)
         df['ActualStrTime'] = pd.to_datetime(df['ActualStrTime'])
         df['ActualEndTime'] = pd.to_datetime(df['ActualEndTime'])
-        df = df[df.ActualStrTime >= MIN_DATETIME]
+        df = StrausDataBuilder.filter_df_by_dt(df, "ActualStrTime")
         return df
 
     @staticmethod
@@ -150,10 +174,33 @@ class StrausDataBuilder(DataBuilder):
         df = pd.read_csv(file_path)
         df = df.fillna(0)
         df = df.astype({"StoppageType": int})
-        # df = df[df.StoppageType == UNPLANNED_STOPPAGE_TYPE_ID]
+        df = df[df.StoppageType == UNPLANNED_STOPPAGE_TYPE_ID]
         df.drop(columns=['StoppageEventName', 'StoppageTypeName', "StoppageType"],
                 inplace=True)
         return df
+
+    @staticmethod
+    def add_temp_index_to_qmp_order_log_data(qmp_order_log_df, temp_index_df):
+        qmp_order_log_df["ShellIndex"] = np.nan
+        qmp_order_log_df["WrapIndex"] = np.nan
+
+        max_idx = temp_index_df.index.max()
+        for idx, temp_index_row in temp_index_df.iterrows():
+            start_time = temp_index_row[DATETIME_COLUMN]
+            if idx + 1 <= max_idx:
+                end_time = temp_index_df.loc[idx + 1, DATETIME_COLUMN]
+            else:
+                end_time = start_time + timedelta(hours=1)
+
+            qmp_order_log_sub_df = StrausDataBuilder.filter_df_by_dt(qmp_order_log_df,
+                                                                     DATETIME_COLUMN,
+                                                                     start_time,
+                                                                     end_time)
+
+            qmp_order_log_df.loc[qmp_order_log_sub_df.index, "ShellIndex"] = temp_index_row["ShellIndex"]
+            qmp_order_log_df.loc[qmp_order_log_sub_df.index, "WrapIndex"] = temp_index_row["WrapIndex"]
+
+        return qmp_order_log_df
 
     @staticmethod
     def add_stoppage_ind_to_qmp_order_log_data(qmp_order_log_df, stoppage_log_event_df):
@@ -162,8 +209,11 @@ class StrausDataBuilder(DataBuilder):
         for idx, stoppage_log_event in stoppage_log_event_df.iterrows():
             stoppage_start_time = stoppage_log_event['ActualStrTime']
             stoppage_end_time = stoppage_log_event['ActualEndTime']
-            stoppage_qmp_df = qmp_order_log_df[(qmp_order_log_df.TimeStmp >= stoppage_start_time) &
-                                               (qmp_order_log_df.TimeStmp <= stoppage_end_time)]
+            stoppage_qmp_df = StrausDataBuilder.filter_df_by_dt(qmp_order_log_df,
+                                                                DATETIME_COLUMN,
+                                                                stoppage_start_time,
+                                                                stoppage_end_time)
+
             qmp_order_log_df.loc[stoppage_qmp_df.index, 'is_stoppage'] = 1
 
         qmp_order_log_df['is_stoppage'] = qmp_order_log_df['is_stoppage'].astype(str).astype("category")
@@ -182,7 +232,7 @@ class StrausDataBuilder(DataBuilder):
         qmp_order_log_joined_df = qmp_order_log_joined_df.astype({'OrderStepId': 'int32',
                                                                   "QmpId": "int32",
                                                                   "PartId": "int32"})
-        qmp_order_log_joined_df.sort_values(by="TimeStmp", inplace=True)
+        qmp_order_log_joined_df.sort_values(by=DATETIME_COLUMN, inplace=True)
         qmp_order_log_joined_df.reset_index(drop=True, inplace=True)
         return qmp_order_log_joined_df
 
@@ -262,7 +312,8 @@ class StrausDataBuilder(DataBuilder):
             sub_df = df[df[KEY_COLUMN] == key]
             time_index = pd.unique(sub_df[DATETIME_COLUMN])
             time_index_time_idx_mapping = dict(zip(pd.to_datetime(time_index), list(range(1, len(time_index) + 1))))
-            df.loc[sub_df.index, 'time_idx'] = sub_df.apply(lambda x: self._get_time_idx(x, time_index_time_idx_mapping), axis=1)
+            df.loc[sub_df.index, 'time_idx'] = sub_df.apply(
+                lambda x: self._get_time_idx(x, time_index_time_idx_mapping), axis=1)
         return df
 
     @staticmethod
@@ -288,15 +339,13 @@ class StrausDataBuilder(DataBuilder):
             time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx", "TargetValue"],
             time_varying_unknown_categoricals=[],
-            time_varying_unknown_reals=[
-                self.config.get("ValueKeyword")
-            ],
+            time_varying_unknown_reals=["ActualValue"] + self.config.get("ValueKeyword"),
             add_relative_time_idx=True,
             add_encoder_length=False,
             allow_missing_timesteps=True,
             categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True),
-                                  **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in
-                                     self.config.get("DatetimeAdditionalColumns")}},
+                                  **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in self.config.get("DatetimeAdditionalColumns")}},
+            target_normalizer=MultiNormalizer([NaNLabelEncoder(add_nan=True), NaNLabelEncoder(add_nan=True)])
         )
         return straus_train_ts_ds
 
