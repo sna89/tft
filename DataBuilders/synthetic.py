@@ -1,5 +1,5 @@
 import pandas as pd
-from pytorch_forecasting import TimeSeriesDataSet
+from pytorch_forecasting import TimeSeriesDataSet, MultiNormalizer, NaNLabelEncoder
 from data_utils import create_bounds_labels
 from DataBuilders.data_builder import DataBuilder
 import numpy as np
@@ -62,7 +62,7 @@ class SyntheticDataBuilder(DataBuilder):
 
     @staticmethod
     def _calc_bound_delta(group_quantiles):
-        return abs(group_quantiles[0] - group_quantiles[-1]) * 0.001
+        return abs(group_quantiles[0] - group_quantiles[-1]) * 0.01
 
     def define_regression_ts_ds(self, train_df):
         ts_ds = TimeSeriesDataSet(
@@ -77,9 +77,56 @@ class SyntheticDataBuilder(DataBuilder):
             time_varying_unknown_reals=[self.config.get("ValueKeyword")],
             time_varying_known_reals=["time_idx"],
             time_varying_known_categoricals=[],
+            static_reals=[],
+            static_categoricals=[self.config.get("GroupKeyword")],
             # target_normalizer=GroupNormalizer(groups=["series"]),
             add_relative_time_idx=True,
-            add_target_scales=True,
+            add_target_scales=False,
             randomize_length=None
+        )
+        return ts_ds
+
+    def define_classification_ts_ds(self, train_df):
+        ts_ds = TimeSeriesDataSet(
+            train_df,
+            time_idx="time_idx",
+            target=self.config.get("ObservedBoundKeyword"),
+            group_ids=[self.config.get("GroupKeyword")],
+            min_encoder_length=self.enc_length,
+            max_encoder_length=self.enc_length,
+            min_prediction_length=self.prediction_length,
+            max_prediction_length=self.prediction_length,
+            time_varying_unknown_reals=[self.config.get("ValueKeyword")],
+            time_varying_known_reals=["time_idx"],
+            time_varying_known_categoricals=[],
+            static_reals=[],
+            static_categoricals=[self.config.get("GroupKeyword")],
+            time_varying_unknown_categoricals=[self.config.get("ObservedBoundKeyword")],
+            add_relative_time_idx=True,
+            add_target_scales=False,
+            randomize_length=None,
+            # categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True)}
+        )
+        return ts_ds
+
+    def define_combined_ts_ds(self, train_df):
+        ts_ds = TimeSeriesDataSet(
+            train_df,
+            time_idx="time_idx",
+            target=[self.config.get("ValueKeyword"), self.config.get("ObservedBoundKeyword")],
+            group_ids=[self.config.get("GroupKeyword")],
+            min_encoder_length=self.enc_length,
+            max_encoder_length=self.enc_length,
+            min_prediction_length=self.prediction_length,
+            max_prediction_length=self.prediction_length,
+            time_varying_unknown_reals=[self.config.get("ValueKeyword")],
+            time_varying_known_reals=["time_idx"],
+            time_varying_known_categoricals=[],
+            time_varying_unknown_categoricals=[self.config.get("ObservedBoundKeyword")],
+            static_reals=[],
+            static_categoricals=[self.config.get("GroupKeyword")],
+            add_relative_time_idx=True,
+            add_target_scales=True,
+            randomize_length=None,
         )
         return ts_ds

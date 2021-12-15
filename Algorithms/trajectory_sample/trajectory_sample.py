@@ -11,7 +11,7 @@ from data_utils import get_group_lower_and_upper_bounds, get_group_id_group_name
 
 class TrajectorySample:
     def __init__(self, env, config, deepar_model, val_df, test_df, num_trajectories=1000):
-        assert os.getenv("MODEL_NAME") == "DeepAR", "Must use deep ar model to run TrajectorySample algorithm"
+        assert os.getenv("MODEL_NAME_REG") == "DeepAR", "Must use deep ar model to run TrajectorySample algorithm"
 
         self.env = env
         self.config = config

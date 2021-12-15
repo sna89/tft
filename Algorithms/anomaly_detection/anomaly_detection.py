@@ -19,7 +19,10 @@ class AnomalyDetection:
         self.dataset_name = dataset_name
         self.forecast_model = forecast_model
 
-    def detect_and_evaluate(self, df, ts_ds, plot=False):
+    def detect_and_evaluate(self, train_df, test_df, plot=False):
+        train_ts_ds, parameters = convert_df_to_ts_data(self.config, self.dataset_name, train_df, None, "reg")
+        ts_ds, _ = convert_df_to_ts_data(self.config, self.dataset_name, test_df, parameters, "reg")
+
         anomaly_actual_dict = self._build_anomaly_actual_dict()
         anomaly_prediction_dict = dict()
         anomaly_dict = dict()
@@ -56,11 +59,11 @@ class AnomalyDetection:
                         self._get_prediction_indices(group_indices, idx.item(), self.config.get("PredictionLength") - 1)
                     )
                     anomaly_prediction_dict[group_name].append(1)
-                    current_time_idx = self.get_current_time_idx(df, group_name, idx, x)
+                    current_time_idx = self.get_current_time_idx(test_df, group_name, idx, x)
 
                     current_dt = None
-                    if DATETIME_COLUMN in df.columns:
-                        current_dt = df[df['time_idx'] == current_time_idx][DATETIME_COLUMN].iloc[0]
+                    if DATETIME_COLUMN in test_df.columns:
+                        current_dt = test_df[test_df['time_idx'] == current_time_idx][DATETIME_COLUMN].iloc[0]
 
                     anomaly_dict[anomaly_idx] = {
                         "GroupName": group_name,
@@ -72,7 +75,7 @@ class AnomalyDetection:
                     anomaly_idx += 1
                     if plot:
                         plot_single_prediction(self.config,
-                                               df,
+                                               test_df,
                                                x_index_df,
                                                idx.item(),
                                                predictions,

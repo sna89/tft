@@ -4,8 +4,6 @@ from config import DATETIME_COLUMN, OBSERVED_KEYWORD, NOT_OBSERVED_KEYWORD
 from typing import List, Union, Dict
 import os
 import torch
-from datetime import timedelta
-import time
 
 
 def filter_df_by_date(df, min_date=None, max_date=None):
@@ -60,9 +58,11 @@ def add_log_column(data, col_name):
     data[new_col_name] = np.log(data[col_name])
 
 
-def get_dataloader(ts_ds, is_train, config):
-    dataloader = ts_ds.to_dataloader(train=is_train, batch_size=config["Train"].get("BatchSize"),
-                                     num_workers=config["Train"].get("CPU"))
+def get_dataloader(ts_ds, is_train, config, drop_last=False):
+    dataloader = ts_ds.to_dataloader(train=is_train,
+                                     batch_size=config["Train"].get("BatchSize"),
+                                     num_workers=config["Train"].get("CPU"),
+                                     drop_last=drop_last)
     return dataloader
 
 
@@ -156,19 +156,12 @@ def is_group_prediction_out_of_bound(group_prediction, lb, ub):
         return False, -1
 
 
-def get_label_weights(df, labels, label_keyword):
-    weights = []
-    for label in labels:
-        label_count = df[df[label_keyword] == label].shape[0]
-        weights.append(label_count)
-    max_weight = max(weights)
-    weights = [max_weight / weight for weight in weights]
-    return weights
-
-
 def flatten_nested_list(nl):
     flat_list = []
     for sublist in nl:
         for item in sublist:
             flat_list.append(item)
     return flat_list
+
+
+

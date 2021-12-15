@@ -18,7 +18,7 @@ def split_df(config, dataset_name, data):
     return train_df, val_df, test_df
 
 
-def convert_df_to_ts_data(config, dataset_name, df, parameters=None, type_="reg"):
+def convert_df_to_ts_data(config, dataset_name, df, parameters, task_type):
     data_builder = get_data_builder(config, dataset_name)
-    ts_ds, parameters = data_builder.build_ts_data(df, parameters, type_)
+    ts_ds, parameters = data_builder.build_ts_data(df, parameters, task_type)
     return ts_ds, parameters

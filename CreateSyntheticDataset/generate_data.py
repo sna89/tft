@@ -56,11 +56,11 @@ def create_trend(n_series, num_sub_series, num_correlated, timesteps, type_="lin
     return trends_list
 
 
-def create_seasonality_f(n_series, timesteps, cycle_length_low, cycle_length_high, num_correlated):
+def create_seasonality_f(n_series, timesteps, cycle_length_low, cycle_length_high):
     seasonality_low = timesteps // cycle_length_high
     seasonality_high = timesteps // cycle_length_low
     option_list = list(range(seasonality_low, seasonality_high + 1, 2))
-    seasonality_f = create_correlated_from_random_choice(n_series, num_correlated, option_list)
+    seasonality_f = np.random.choice(a=option_list, size=n_series)[:, None]
     return seasonality_f
 
 
@@ -175,7 +175,6 @@ def generate_parameters(
     linear_trends_list = create_trend(n_series, num_sub_series, num_correlated, timesteps_sub_series, type_="linear")
     levels = create_levels(level, n_series, num_correlated)
     seasonality_amp = create_seasonality_amplitude(n_series)
-    seasonality_f = create_seasonality_f(n_series, timesteps_sub_series, cycle_length_low, cycle_length_high,
-                                         num_correlated)
+    seasonality_f = create_seasonality_f(n_series, timesteps_sub_series, cycle_length_low, cycle_length_high)
 
     return linear_trends_list, levels, seasonality_amp, seasonality_f

@@ -5,28 +5,44 @@ from data_utils import get_dataloader, get_group_id_group_name_mapping
 import pandas as pd
 import os
 
-# with torch.no_grad():
-    #     for x, _ in dl:
-    #         ppp = model.forward(x, True)
 
-
-def get_actuals(dl):
-    actuals = torch.cat([y[0] for x, y in iter(dl)])
-    return actuals
-
-
-def evaluate_regression(config, ts_ds, model):
+def get_actual_and_predictions(config, ts_ds, model, num_targets):
     dl = get_dataloader(ts_ds, False, config)
-    actuals = get_actuals(dl)
+
+    actual_list = get_actual_list(dl, num_targets)
     predictions, x = model.predict(dl, mode="prediction", return_x=True, show_progress_bar=True)
-    print()
+
+    return actual_list, predictions, x
+
+
+def get_actual_list(dl, num_targets):
+    if num_targets == 1:
+        ly = [y[0] for x, y in iter(dl)]
+        actual = torch.cat(ly)
+        return [actual]
+    else:
+        actual_list = []
+        for num_target in range(num_targets):
+            ly = [y[0][num_target] for x, y in iter(dl)]
+            actual = torch.cat(ly)
+            actual_list.append(actual)
+        return actual_list
+
+
+def evaluate_regression(config, ts_ds, model, num_targets):
+    actual_list, predictions, x = get_actual_and_predictions(config, ts_ds, model, num_targets)
     print()
 
-    evaluate_regression_groups(config, ts_ds, actuals, predictions)
+    for num_target in range(num_targets):
+        target = ts_ds.target_names[num_target]
+        print(target)
 
-    mse = mean_squared_error(actuals, predictions)
-    mae = mean_absolute_error(actuals, predictions)
-    print("MAE: {} MSE: {}".format(mae, mse))
+        actual = actual_list[num_target]
+        evaluate_regression_groups(config, ts_ds, actual, predictions)
+
+        mse = mean_squared_error(actual, predictions)
+        mae = mean_absolute_error(actual, predictions)
+        print("MAE: {} MSE: {}".format(mae, mse))
 
 
 def evaluate_regression_groups(config, ts_ds, actual, predictions):
@@ -44,16 +60,22 @@ def evaluate_regression_group(actual, predictions, group_name, group_indices):
     print("Group: {}, MAE: {}, MSE: {}".format(group_name, group_mae, group_mse))
 
 
-def evaluate_classification(config, ts_ds, model):
-    dl = get_dataloader(ts_ds, False, config)
-    actual = get_actuals(dl)
-    predictions, x = model.predict(dl, return_x=True, show_progress_bar=True)
+def evaluate_classification(config, ts_ds, model, num_targets):
+    actual_list, predictions, x = get_actual_and_predictions(config, ts_ds, model, num_targets)
+
+    prediction_steps = config.get("Env").get("AlertMaxPredictionSteps")
+    actual = trim_last_samples(actual_list, prediction_steps)
+    predictions = trim_last_samples(predictions, prediction_steps)
 
     get_classification_evaluation_summary(actual, predictions)
 
 
+def trim_last_samples(sample_list, k):
+    return torch.Tensor([min(sum(a[:k]), 1) for a in sample_list])
+
+
 def get_classification_evaluation_summary(actual, predictions):
-    tn, fp, fn, tp = confusion_matrix(actual.reshape(-1, 1), predictions.reshape(-1, 1)).ravel()
+    tn, fp, fn, tp = confusion_matrix(actual, predictions).ravel()
     print("TN: {}, FP: {}, FN: {}, TP: {}".format(tn, fp, fn, tp))
 
     precision = tp / (float(tp + fp))
@@ -72,3 +94,20 @@ def evaluate_base_model(dl):
     mse = mean_squared_error(actuals, baseline_predictions)
     mae = mean_absolute_error(actuals, baseline_predictions)
     return mse, mae
+
+
+def evaluate_combined(config, ts_ds, model, num_targets):
+    dl = get_dataloader(ts_ds, False, config)
+    actual_list = get_actual_list(dl, num_targets)
+    predictions, x = model.predict(dl, mode="prediction", return_x=True, show_progress_bar=True)
+
+    evaluate_regression_groups(config, ts_ds, actual_list[0], predictions[0])
+    mse = mean_squared_error(actual_list[0], predictions[0])
+    mae = mean_absolute_error(actual_list[0], predictions[0])
+    print("MAE: {} MSE: {}".format(mae, mse))
+
+    prediction_steps = config.get("Env").get("AlertMaxPredictionSteps")
+    actual = trim_last_samples(actual_list[1], prediction_steps)
+    prediction = trim_last_samples(predictions[1], prediction_steps)
+
+    get_classification_evaluation_summary(actual, prediction)

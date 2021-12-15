@@ -34,7 +34,7 @@ class StrausDataBuilder(DataBuilder):
         qmp_order_log_df = self.add_stoppage_ind_to_qmp_order_log_data(qmp_order_log_df, stoppage_log_event_df)
         qmp_order_log_df = self.add_temp_index_to_qmp_order_log_data(qmp_order_log_df, temp_index_df)
         self._create_key_column(qmp_order_log_df)
-        for group_col in self.config.get("GroupColumns") + [KEY_COLUMN]:
+        for group_col in self.config.get("GroupColumns") + [KEY_COLUMN] + ["QmpId"]:
             qmp_order_log_df[group_col] = qmp_order_log_df[group_col].astype(str).astype("category")
         # self._get_bounds(filename, data)
         qmp_order_log_df.drop_duplicates(subset=["QmpId", "PartId", "OrderStepId", DATETIME_COLUMN], inplace=True)
@@ -86,7 +86,12 @@ class StrausDataBuilder(DataBuilder):
         df = pd.read_csv(file_path, names=[DATETIME_COLUMN, "Time", "ShellIndex", "WrapIndex"], header=0)
 
         df["ShellIndex"] = pd.to_numeric(df["ShellIndex"].replace("-", np.nan))
+        df["ShellIndex"].interpolate(method='linear', inplace=True)
+        df["ShellIndex"].bfill(inplace=True)
+
         df["WrapIndex"] = pd.to_numeric(df["WrapIndex"].replace("-", np.nan))
+        df["WrapIndex"].interpolate(method='linear', inplace=True)
+        df["WrapIndex"].bfill(inplace=True)
 
         df[DATETIME_COLUMN] = df[DATETIME_COLUMN].fillna(method="ffill")
         df[DATETIME_COLUMN] = df[DATETIME_COLUMN].str.replace("202$", "2021")
@@ -200,6 +205,7 @@ class StrausDataBuilder(DataBuilder):
             qmp_order_log_df.loc[qmp_order_log_sub_df.index, "ShellIndex"] = temp_index_row["ShellIndex"]
             qmp_order_log_df.loc[qmp_order_log_sub_df.index, "WrapIndex"] = temp_index_row["WrapIndex"]
 
+        qmp_order_log_df.dropna(inplace=True)
         return qmp_order_log_df
 
     @staticmethod
@@ -277,8 +283,9 @@ class StrausDataBuilder(DataBuilder):
     @staticmethod
     def _create_key_column(data):
         data[KEY_COLUMN] = data['PartId'].astype(str) + KEY_DELIMITER + \
-                           data['OrderStepId'].astype(int).astype(str) + KEY_DELIMITER + \
-                           data['QmpId'].astype(int).astype(str)
+                           data['OrderStepId'].astype(int).astype(str)
+        # + KEY_DELIMITER + \
+                           # data['QmpId'].astype(int).astype(str)
 
     def _get_bounds(self, filename, data):
         if 'CI_QmpLog_data' in filename:
@@ -334,18 +341,19 @@ class StrausDataBuilder(DataBuilder):
             max_encoder_length=self.config.get("EncoderLength"),
             min_prediction_length=self.config.get("PredictionLength"),
             max_prediction_length=self.config.get("PredictionLength"),
-            static_categoricals=[self.config.get("GroupKeyword")],
+            static_categoricals=[self.config.get("GroupKeyword"), "QmpId"],
             static_reals=[],
             time_varying_known_categoricals=self.config.get("DatetimeAdditionalColumns"),
             time_varying_known_reals=["time_idx", "TargetValue"],
             time_varying_unknown_categoricals=[],
-            time_varying_unknown_reals=["ActualValue"] + self.config.get("ValueKeyword"),
+            time_varying_unknown_reals=["ActualValue"] + [self.config.get("ValueKeyword")],
             add_relative_time_idx=True,
             add_encoder_length=False,
             allow_missing_timesteps=True,
             categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True),
                                   **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in self.config.get("DatetimeAdditionalColumns")}},
-            target_normalizer=MultiNormalizer([NaNLabelEncoder(add_nan=True), NaNLabelEncoder(add_nan=True)])
+            # target_normalizer=MultiNormalizer([NaNLabelEncoder(add_nan=True), NaNLabelEncoder(add_nan=True)])
+            # target_normalizer=NaNLabelEncoder(add_nan=True)
         )
         return straus_train_ts_ds
 
@@ -376,51 +384,51 @@ class StrausDataBuilder(DataBuilder):
         )
         return straus_train_ts_ds
 
-    def split_train_val_test(self, data: pd.DataFrame()):
-        np.random.seed(42)
-
-        train_df_list = []
-        val_df_list = []
-
-        date_index = pd.DatetimeIndex(data[DATETIME_COLUMN])
-        date_index_total_time = date_index.max() - date_index.min()
-        test_time_start_dt = date_index.min() + date_index_total_time * (self.train_ratio + self.val_ratio)
-
-        test_df = data[lambda x: x[DATETIME_COLUMN] >= test_time_start_dt]
-        data = data[lambda x: x[DATETIME_COLUMN] < test_time_start_dt]
-
-        encoder_len = self.config.get("EncoderLength")
-        prediction_len = self.config.get("PredictionLength")
-        groups = pd.unique(data[self.config.get("GroupKeyword")])
-        for i, group in enumerate(groups):
-            sub_df = data[data[self.config.get("GroupKeyword")] == group]
-            time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
-            if time_idx_delta <= encoder_len + prediction_len:
-                continue
-
-            random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
-                                                                   sub_df.time_idx.max() - prediction_len),
-                                                         size=(5, 2)))
-            for time_idx in random_time_idx_list:
-                train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
-                                      & (sub_df.time_idx <= time_idx[0] + prediction_len)]
-                val_sub_df = sub_df[(sub_df.time_idx >= time_idx[1] - encoder_len)
-                                    & (sub_df.time_idx <= time_idx[1] + prediction_len)]
-
-                train_df_list.append(train_sub_df)
-                val_df_list.append(val_sub_df)
-
-        train_df = pd.concat(train_df_list, axis=0)
-        val_df = pd.concat(val_df_list, axis=0)
-
-        train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-            sort_values('time_idx'). \
-            reset_index(drop=True)
-        val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-            sort_values('time_idx'). \
-            reset_index(drop=True)
-        test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-            sort_values('time_idx'). \
-            reset_index(drop=True)
-
-        return train_df, val_df, test_df
+    # def split_train_val_test(self, data: pd.DataFrame()):
+    #     np.random.seed(42)
+    #
+    #     train_df_list = []
+    #     val_df_list = []
+    #
+    #     date_index = pd.DatetimeIndex(data[DATETIME_COLUMN])
+    #     date_index_total_time = date_index.max() - date_index.min()
+    #     test_time_start_dt = date_index.min() + date_index_total_time * (self.train_ratio + self.val_ratio)
+    #
+    #     test_df = data[lambda x: x[DATETIME_COLUMN] >= test_time_start_dt]
+    #     data = data[lambda x: x[DATETIME_COLUMN] < test_time_start_dt]
+    #
+    #     encoder_len = self.config.get("EncoderLength")
+    #     prediction_len = self.config.get("PredictionLength")
+    #     groups = pd.unique(data[self.config.get("GroupKeyword")])
+    #     for i, group in enumerate(groups):
+    #         sub_df = data[data[self.config.get("GroupKeyword")] == group]
+    #         time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
+    #         if time_idx_delta <= encoder_len + prediction_len:
+    #             continue
+    #
+    #         random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
+    #                                                                sub_df.time_idx.max() - prediction_len),
+    #                                                      size=(5, 2)))
+    #         for time_idx in random_time_idx_list:
+    #             train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
+    #                                   & (sub_df.time_idx <= time_idx[0] + prediction_len)]
+    #             val_sub_df = sub_df[(sub_df.time_idx >= time_idx[1] - encoder_len)
+    #                                 & (sub_df.time_idx <= time_idx[1] + prediction_len)]
+    #
+    #             train_df_list.append(train_sub_df)
+    #             val_df_list.append(val_sub_df)
+    #
+    #     train_df = pd.concat(train_df_list, axis=0)
+    #     val_df = pd.concat(val_df_list, axis=0)
+    #
+    #     train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+    #         sort_values('time_idx'). \
+    #         reset_index(drop=True)
+    #     val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+    #         sort_values('time_idx'). \
+    #         reset_index(drop=True)
+    #     test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+    #         sort_values('time_idx'). \
+    #         reset_index(drop=True)
+    #
+    #     return train_df, val_df, test_df

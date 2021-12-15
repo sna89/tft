@@ -23,6 +23,15 @@ PLOT = os.path.join(PLOT)
 STUDY = "Study"
 STUDY_BASE_FOLDER = os.path.join(STUDY)
 
+CLASSIFICATION_TASK_TYPE = "class"
+CLASSIFICATION_FOLDER = "Class"
+
+REGRESSION_TASK_TYPE = "reg"
+REGRESSION_FOLDER = "Reg"
+
+COMBINED_TASK_TYPE = "combined"
+COMBINED_FOLDER = "Combined"
+
 
 def init_base_folders():
     if not os.path.isdir(DATA):
@@ -39,8 +48,9 @@ def init_dataset_folders(dataset_name):
     dataset_path = os.path.join(DATA, dataset_name)
 
     study_path = os.path.join(STUDY, dataset_name)
-    study_reg_path = os.path.join(study_path, "Reg")
-    study_class_path = os.path.join(study_path, "Class")
+    study_reg_path = os.path.join(study_path, REGRESSION_FOLDER)
+    study_class_path = os.path.join(study_path, CLASSIFICATION_FOLDER)
+    study_combined_path = os.path.join(study_path, COMBINED_FOLDER)
 
     plot_path = os.path.join(PLOT, dataset_name)
 
@@ -52,6 +62,8 @@ def init_dataset_folders(dataset_name):
         os.mkdir(study_reg_path)
     if not os.path.isdir(study_class_path):
         os.mkdir(study_class_path)
+    if not os.path.isdir(study_combined_path):
+        os.mkdir(study_combined_path)
     if not os.path.isdir(plot_path):
         os.mkdir(plot_path)
 
@@ -75,7 +87,7 @@ def get_config(dataset_name):
             "TestDataFramePicklePath": os.path.join('pkl', 'fisherman_test_df.pkl'),
             "ValDataFramePicklePath": os.path.join('pkl', 'fisherman_val_df.pkl'),
             "GroupMappingPicklePath": os.path.join('pkl', 'fisherman_group_mapping.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman', REGRESSION_FOLDER),
             "EncoderLength": 144,
             "PredictionLength": 6,
             "GroupKeyword": "Sensor",
@@ -89,7 +101,7 @@ def get_config(dataset_name):
             "TestDataFramePicklePath": os.path.join('pkl', 'fisherman2_test_df.pkl'),
             "ValDataFramePicklePath": os.path.join('pkl', 'fisherman2_val_df.pkl'),
             "GroupMappingPicklePath": os.path.join('pkl', 'fisherman2_group_mapping.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman2', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman2', REGRESSION_FOLDER),
             "EncoderLength": 72,
             "PredictionLength": 6,
             "GroupKeyword": "Key",
@@ -105,7 +117,9 @@ def get_config(dataset_name):
             "Filename": "SyntheticDataset.csv",
             "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
             "TestTsDsPicklePath": os.path.join('pkl', 'synthetic_test_ts_ds.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER),
+            "StudyClassPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', CLASSIFICATION_FOLDER),
+            "StudyCombinedPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', COMBINED_FOLDER),
             "EncoderLength": 400,
             "PredictionLength": 7,
             "GroupKeyword": "Series",
@@ -121,11 +135,11 @@ def get_config(dataset_name):
             "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
             "TestDataFramePicklePath": os.path.join('pkl', 'straus_test_df.pkl'),
             "TestTsDsPicklePath": os.path.join('pkl', 'straus_test_ts_ds.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER),
             "GroupKeyword": "key",
-            "GroupColumns": ['PartId', 'OrderStepId', 'QmpId'],
+            "GroupColumns": ['PartId', 'OrderStepId'],
             # "ValueKeyword": "ActualValue",
-            "ValueKeyword": ["ShellIndex", "WrapIndex"],
+            "ValueKeyword": "ShellIndex",
             "ExceptionKeyword": "is_stoppage",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "EncoderLength": 360,
@@ -133,7 +147,7 @@ def get_config(dataset_name):
         },
         "SMD": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'SMD'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'SMD', REGRESSION_FOLDER),
             "GroupColumns": ["Machine", "Dimension"],
             "ValueKeyword": "Value",
             "LabelKeyword": "Label",
@@ -142,7 +156,7 @@ def get_config(dataset_name):
         },
         "MSL": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'SMAP_MSL'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'MSL', 'Reg'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'MSL', REGRESSION_FOLDER),
             "GroupKeyword": "Channel",
             "ValueKeyword": "Value",
             "LabelKeyword": "Label",
@@ -153,7 +167,7 @@ def get_config(dataset_name):
 
     train_config = {
         "Train": {
-            "BatchSize": 32,
+            "BatchSize": 128,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0

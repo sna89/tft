@@ -1,17 +1,16 @@
 from pytorch_forecasting import TemporalFusionTransformer
-from pytorch_forecasting.metrics import QuantileLoss, CrossEntropy
 from pytorch_forecasting.models.temporal_fusion_transformer.tuning import optimize_hyperparameters
 from pytorch_forecasting import TimeSeriesDataSet
 from utils import save_to_pickle
 
 
-def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path):
+def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path, loss):
     study = optimize_hyperparameters(
         train_dl,
         val_dl,
         model_path=study_path,
-        n_trials=20,
-        max_epochs=25,
+        n_trials=1,
+        max_epochs=20,
         gradient_clip_val_range=(0.01, 1.0),
         hidden_size_range=(8, 128),
         hidden_continuous_size_range=(8, 128),
@@ -21,15 +20,13 @@ def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path):
         trainer_kwargs=dict(limit_train_batches=30),
         reduce_on_plateau_patience=4,
         use_learning_rate_finder=False,
+        loss=loss
     )
     save_to_pickle(study, study_pkl_path)
     return study
 
 
-def create_tft_model(training_data: TimeSeriesDataSet, study=None):
-    loss = QuantileLoss([0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99])
-    output_size = 7
-
+def create_tft_model(training_data: TimeSeriesDataSet, loss, output_size, study=None):
     if study:
         params = study.best_params
         del params['gradient_clip_val']

@@ -1,25 +1,21 @@
 import pandas as pd
 from config import get_config
-from Models.trainer import optimize_hp, fit_regression_model, create_classification_model, fit_classification_model
-from DataBuilders.build import build_data, split_df, convert_df_to_ts_data, process_data
-from evaluation import evaluate_regression, evaluate_classification, get_classification_evaluation_summary
+from DataBuilders.build import split_df
+from Tasks.thts_task import run_thts_task
+from Tasks.time_series_task import run_time_series_task
+from DataBuilders.build import build_data, process_data
 import warnings
 import os
-from utils import save_to_pickle
-from plot import plot_reg_predictions, plot_data
-import gym
-from Algorithms.thts.max_uct import MaxUCT
+from plot import plot_data
 from Algorithms.trajectory_sample.trajectory_sample import TrajectorySample
-from data_utils import get_label_weights
 from Algorithms.anomaly_detection.anomaly_detection import AnomalyDetection
+from config import REGRESSION_TASK_TYPE, CLASSIFICATION_TASK_TYPE, COMBINED_TASK_TYPE
+
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
-import datetime
-
 
 if __name__ == '__main__':
     dataset_name = os.getenv("DATASET")
-    model_name = os.getenv("MODEL_NAME")
 
     config = get_config(dataset_name)
 
@@ -28,36 +24,44 @@ if __name__ == '__main__':
     # plot_data(config, dataset_name, data)
 
     train_df, val_df, test_df = split_df(config, dataset_name, data)
-    train_ts_ds, parameters = convert_df_to_ts_data(config, dataset_name, train_df, None, "reg")
-    val_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, val_df, parameters, "reg")
-    test_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, test_df, parameters, "reg")
+    fitted_reg_model = None
 
-    reg_study = optimize_hp(config, train_ts_ds, val_ts_ds, model_name, type_="reg")
-    fitted_reg_model = fit_regression_model(config, train_ts_ds, val_ts_ds, model_name, reg_study, type_="reg")
+    if os.getenv("REG_TASK") == "True":
+        fitted_reg_model = run_time_series_task(config,
+                                                REGRESSION_TASK_TYPE,
+                                                dataset_name,
+                                                train_df,
+                                                val_df,
+                                                test_df,
+                                                evaluate=False,
+                                                plot=True)
 
-    evaluate_regression(config, test_ts_ds, fitted_reg_model)
-    plot_reg_predictions(config, fitted_reg_model, test_df, test_ts_ds, dataset_name, model_name)
+    if os.getenv("CLASS_TASK") == "True":
+        run_time_series_task(config,
+                             CLASSIFICATION_TASK_TYPE,
+                             dataset_name,
+                             train_df,
+                             val_df,
+                             test_df,
+                             evaluate=True)
 
-    # detector = AnomalyDetection(config, model_name, dataset_name, fitted_reg_model)
-    # anomaly_df = detector.detect_and_evaluate(test_df, test_ts_ds, True)
+    if os.getenv("COMBINED_TASK") == "True":
+        run_time_series_task(config,
+                             COMBINED_TASK_TYPE,
+                             dataset_name,
+                             train_df,
+                             val_df,
+                             test_df,
+                             evaluate=True)
 
-    # save_to_pickle(test_df, config.get("TestDataFramePicklePath"))
-    # save_to_pickle(test_ts_ds, config.get("TestTsDsPicklePath"))
-    # ad_env = gym.make("gym_ad:ad-v0")
-    # thts = MaxUCT(ad_env, config)
-    # thts.run(test_df)
+    # run_thts_task(config,
+    #               dataset_name,
+    #               train_df,
+    #               test_df)
 
-    # train_exc_df, val_exc_df, test_exc_df = split_df(config, dataset_name, pd.concat([val_df, test_df], axis=0))
-    # train_exc_ts_ds, parameters = convert_df_to_ts_data(config, dataset_name, train_df, None, "class")
-    # val_exc_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, val_df, parameters, "class")
-    # test_exc_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, test_df, parameters, "class")
-
-    # weights = get_label_weights(pd.concat([train_exc_df, val_exc_df], axis=0),
-    #                             labels=[str(0), str(1)],
-    #                             label_keyword=config.get("ExceptionKeyword"))
-    # classification_model = create_classification_model(reg_study, weights)
-    # fitted_classification_model = fit_classification_model(config, classification_model, train_exc_ts_ds, val_exc_ts_ds)
-    # evaluate_classification(config, test_exc_ts_ds, fitted_classification_model)
+    if os.getenv("APPLY_ANOMALY_DETECTION") == "True":
+        detector = AnomalyDetection(config, os.getenv("MODEL_NAME_REG"), dataset_name, fitted_reg_model)
+        anomaly_df = detector.detect_and_evaluate(train_df, test_df, True)
 
     # trajectory_sample = TrajectorySample(ad_env, config, fitted_reg_model, val_df, test_df, num_trajectories=5000)
     # trajectory_sample.run()
