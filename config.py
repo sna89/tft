@@ -32,6 +32,8 @@ REGRESSION_FOLDER = "Reg"
 COMBINED_TASK_TYPE = "combined"
 COMBINED_FOLDER = "Combined"
 
+ROLLOUT_TASK_TYPE = "rollout"
+
 
 def init_base_folders():
     if not os.path.isdir(DATA):
@@ -167,7 +169,7 @@ def get_config(dataset_name):
 
     train_config = {
         "Train": {
-            "BatchSize": 128,
+            "BatchSize": 32,
             "TrainRatio": 0.6,
             "ValRatio": 0.2,
             "CPU": 0

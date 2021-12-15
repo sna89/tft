@@ -4,7 +4,11 @@ from utils import load_pickle
 import os
 import pandas as pd
 import numpy as np
-from config import DATETIME_COLUMN, REGRESSION_TASK_TYPE, CLASSIFICATION_TASK_TYPE, COMBINED_TASK_TYPE
+from config import DATETIME_COLUMN, \
+    REGRESSION_TASK_TYPE, \
+    CLASSIFICATION_TASK_TYPE,\
+    COMBINED_TASK_TYPE, \
+    ROLLOUT_TASK_TYPE
 
 
 class DataBuilder(ABC):
@@ -17,7 +21,7 @@ class DataBuilder(ABC):
 
     def build_ts_data(self, df: pd.DataFrame(), parameters, task_type):
         if not parameters:
-            if task_type == REGRESSION_TASK_TYPE:
+            if task_type in [REGRESSION_TASK_TYPE, ROLLOUT_TASK_TYPE]:
                 ts_ds = self.define_regression_ts_ds(df)
             elif task_type == CLASSIFICATION_TASK_TYPE:
                 ts_ds = self.define_classification_ts_ds(df)

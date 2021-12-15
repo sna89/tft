@@ -66,6 +66,12 @@ def get_dataloader(ts_ds, is_train, config, drop_last=False):
     return dataloader
 
 
+def get_idx_list(dl, x, step):
+    index_df = dl.dataset.x_to_index(x)
+    idx_list = list(range(index_df.index.min(), index_df.index.max(), step))
+    return idx_list
+
+
 def get_group_indices_mapping(config, dl):
     mapping = dl.dataset.decoded_index.groupby(config.get("GroupKeyword")).indices
     return mapping

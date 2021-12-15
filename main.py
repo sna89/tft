@@ -2,6 +2,7 @@ import pandas as pd
 from config import get_config
 from DataBuilders.build import split_df
 from Tasks.thts_task import run_thts_task
+from Tasks.rollout_task import run_rollout_task
 from Tasks.time_series_task import run_time_series_task
 from DataBuilders.build import build_data, process_data
 import warnings
@@ -33,8 +34,8 @@ if __name__ == '__main__':
                                                 train_df,
                                                 val_df,
                                                 test_df,
-                                                evaluate=False,
-                                                plot=True)
+                                                evaluate=True,
+                                                plot=False)
 
     if os.getenv("CLASS_TASK") == "True":
         run_time_series_task(config,
@@ -45,14 +46,11 @@ if __name__ == '__main__':
                              test_df,
                              evaluate=True)
 
-    if os.getenv("COMBINED_TASK") == "True":
-        run_time_series_task(config,
-                             COMBINED_TASK_TYPE,
-                             dataset_name,
-                             train_df,
-                             val_df,
-                             test_df,
-                             evaluate=True)
+    if os.getenv("ROLLOUT_TASK") == "True":
+        run_rollout_task(config,
+                         dataset_name,
+                         train_df,
+                         test_df)
 
     # run_thts_task(config,
     #               dataset_name,
