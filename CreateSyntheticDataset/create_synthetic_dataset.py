@@ -2,12 +2,12 @@ import plotly.express as px
 import os
 from CreateSyntheticDataset.generate_data import generate_parameters, create_data_all
 
-VERSIONS = 1
-NUM_SERIES = 10
-NUM_CORRELATED_LIST = [0, 5, 10]
+VERSIONS = 30
+NUM_SERIES = 30
+NUM_CORRELATED_LIST = [0, 15, 30]
 NUM_SUB_SERIES = 10
 TIMESTEPS_SUB_SERIES = 200
-noise = 0.25
+noise = 0.5
 trend = 1
 level = 1
 

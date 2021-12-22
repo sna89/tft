@@ -2,11 +2,13 @@ import os
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
+
+from Models.study import get_study_path, get_study_pkl_path
 from Models.tft import create_tft_model, optimize_tft_hp
 from Models.deep_ar import create_deepar_model, optimize_deepar_hp
 from Models.fc_utils import create_mlp_model
 from data_utils import get_dataloader
-from utils import load_pickle, get_model_from_checkpoint, get_model_from_trainer, get_study_path, get_study_pkl_path
+from utils import load_pickle, get_model_from_checkpoint, get_model_from_trainer
 from config import REGRESSION_TASK_TYPE, COMBINED_TASK_TYPE, CLASSIFICATION_TASK_TYPE
 
 
@@ -94,17 +96,6 @@ def fit(trainer, model, train_dl, val_dl):
     return trainer
 
 
-def get_prediction_mode():
-    model_name = os.getenv("MODEL_NAME_REG")
-    if model_name == "TFT":
-        mode = "raw"
-    elif model_name == "DeepAR":
-        mode = "quantiles"
-    else:
-        raise ValueError
-    return mode
-
-
 def create_model(config, model_name, train_ds, loss, output_size, study=None):
     if model_name == "TFT":
         model = create_tft_model(train_ds, loss, output_size, study)
@@ -115,6 +106,5 @@ def create_model(config, model_name, train_ds, loss, output_size, study=None):
     else:
         raise ValueError
     return model
-
 
 

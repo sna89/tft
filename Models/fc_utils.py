@@ -1,6 +1,7 @@
 from Models.fc import FullyConnectedModel
 from config import REGRESSION_TASK_TYPE
-from utils import get_study_pkl_path, load_pickle
+from Models.trainer import get_study_pkl_path
+from utils import load_pickle
 
 
 def create_mlp_model(config, loss):

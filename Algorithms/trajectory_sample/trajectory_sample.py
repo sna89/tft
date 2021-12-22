@@ -1,6 +1,6 @@
 import pandas as pd
 from env_thts_common import get_num_iterations, get_group_names, \
-     calc_reward, is_state_terminal, get_steps_from_alert, get_max_restart_steps
+     calc_reward, is_state_terminal, get_env_steps_from_alert, get_env_restart_steps
 import os
 import numpy as np
 import time
@@ -17,8 +17,8 @@ class TrajectorySample:
         self.config = config
         self.enc_len = self.config.get("EncoderLength")
         self.pred_len = self.config.get("PredictionLength")
-        self.steps_from_alert = get_steps_from_alert(self.config)
-        self.max_restart_steps = get_max_restart_steps(self.config)
+        self.steps_from_alert = get_env_steps_from_alert(self.config)
+        self.max_restart_steps = get_env_restart_steps(self.config)
         self.deepar_model = deepar_model
         self.val_df = val_df
         self.test_df = test_df

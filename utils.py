@@ -5,7 +5,6 @@ import os
 from pytorch_forecasting.models.temporal_fusion_transformer import TemporalFusionTransformer
 from pytorch_forecasting.models.deepar import DeepAR
 from Models.fc import FullyConnectedModel
-from config import REGRESSION_TASK_TYPE, COMBINED_TASK_TYPE, CLASSIFICATION_TASK_TYPE
 
 
 def save_to_pickle(file, path):
@@ -50,17 +49,14 @@ def get_model_from_checkpoint(checkpoint, model_name):
     return best_model
 
 
-def get_study_path(config, task_type):
-    if task_type == REGRESSION_TASK_TYPE:
-        study_pkl_path = os.path.join(config.get("StudyRegPath"))
-    elif task_type == CLASSIFICATION_TASK_TYPE:
-        study_pkl_path = os.path.join(config.get("StudyClassPath"))
-    elif task_type == COMBINED_TASK_TYPE:
-        study_pkl_path = os.path.join(config.get("StudyCombinedPath"))
+def get_prediction_mode():
+    model_name = os.getenv("MODEL_NAME_REG")
+    if model_name == "TFT":
+        mode = "raw"
+    elif model_name == "DeepAR":
+        mode = "quantiles"
     else:
         raise ValueError
-    return study_pkl_path
+    return mode
 
 
-def get_study_pkl_path(config, task_type):
-    return os.path.join(get_study_path(config, task_type), "study.pkl")

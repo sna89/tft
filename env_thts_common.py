@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict, Union
 from dataclasses import dataclass, field
 from torch import Tensor
@@ -36,15 +37,15 @@ class State:
 
 @dataclass
 class EnvState:
-    env_state: List[State] = field(default_factory=list)
+    env_state: Dict[str, State] = field(default_factory=dict)
 
-    def __eq__(self, other):
-        if isinstance(other, EnvState):
-            for idx, state in enumerate(self.env_state):
-                if state != other.env_state[idx]:
-                    return False
-            return True
-        return False
+    # def __eq__(self, other):
+    #     if isinstance(other, EnvState):
+    #         for idx, state in enumerate(self.env_state):
+    #             if state != other.env_state[idx]:
+    #                 return False
+    #         return True
+    #     return False
 
 
 def build_group_next_state(config,
@@ -119,7 +120,7 @@ def build_next_state(env_name,
                                                                                        group_name)
         terminal_states[group_name] = is_group_terminal
         restart_states[group_name] = is_group_restart
-        next_state.env_state.append(group_next_state)
+        next_state.env_state[group_name] = group_next_state
 
     return next_state, terminal_states, restart_states
 
@@ -127,60 +128,56 @@ def build_next_state(env_name,
 def get_reward(env_name, config, group_names, next_state_terminal_dict, current_state, action_dict: Dict) \
         -> Union[Dict, float]:
     assert env_name in ["simulation", "real"]
-    steps_from_alert = get_steps_from_alert(config)
-    max_restart_steps = get_max_restart_steps(config)
+    env_steps_from_alert = get_env_steps_from_alert(config)
+    env_restart_steps = get_env_restart_steps(config)
 
     reward_group_mapping = {}
 
     for group_name in group_names:
-        reward = 0
         group_current_state = get_group_state(current_state.env_state, group_name)
 
         is_group_current_state_restart = is_state_restart(group_current_state.restart_steps,
-                                                          max_restart_steps)
+                                                          env_restart_steps)
         is_group_current_state_terminal = is_state_terminal(config,
                                                             group_name,
                                                             group_current_state.value,
                                                             is_group_current_state_restart)
         if is_group_current_state_restart or is_group_current_state_terminal:
-            reward_group_mapping[group_name] = reward
+            reward_group_mapping[group_name] = 0
             continue
 
         good_alert, false_alert, missed_alert = get_reward_type_for_group(group_current_state.steps_from_alert,
-                                                                          steps_from_alert,
+                                                                          env_steps_from_alert,
                                                                           next_state_terminal_dict[group_name],
                                                                           action_dict[group_name])
 
-        reward += calc_reward(config,
-                              good_alert,
-                              false_alert,
-                              missed_alert,
-                              group_current_state.steps_from_alert,
-                              steps_from_alert)
+        reward = calc_reward(config,
+                             good_alert,
+                             false_alert,
+                             missed_alert,
+                             group_current_state.steps_from_alert,
+                             env_steps_from_alert)
         reward_group_mapping[group_name] = reward
 
-    if env_name == "simulation":
-        reward = sum([reward for group_name, reward in reward_group_mapping.items()]) / float(len(reward_group_mapping))
-    elif env_name == "real":
-        reward = reward_group_mapping
-    else:
-        raise ValueError
-    return reward
+    return reward_group_mapping
 
 
 def get_reward_type_for_group(group_current_steps_from_alert: int,
-                              steps_from_alert: int,
+                              env_steps_from_alert: int,
                               is_group_next_state_terminal: bool,
-                              action: int):
+                              group_action: int):
     good_alert = False
     false_alert = False
     missed_alert = False
 
-    if is_missed_alert(is_group_next_state_terminal, group_current_steps_from_alert, steps_from_alert, action):
+    if is_missed_alert(is_group_next_state_terminal, group_current_steps_from_alert, env_steps_from_alert,
+                       group_action):
         missed_alert = True
-    elif is_false_alert(is_group_next_state_terminal, group_current_steps_from_alert):
+    elif is_false_alert(is_group_next_state_terminal, group_current_steps_from_alert, env_steps_from_alert,
+                        group_action):
         false_alert = True
-    elif is_good_alert(is_group_next_state_terminal, group_current_steps_from_alert, steps_from_alert, action):
+    elif is_good_alert(is_group_next_state_terminal, group_current_steps_from_alert, env_steps_from_alert,
+                       group_action):
         good_alert = True
     else:
         pass
@@ -193,9 +190,10 @@ def calc_reward(config: dict,
                 missed_alert: bool,
                 current_steps_from_alert: int,
                 steps_from_alert: int):
-    reward_false_alert = config.get("Env").get("Rewards").get("FalseAlert")
-    reward_missed_alert = config.get("Env").get("Rewards").get("MissedAlert")
-    reward_good_alert = config.get("Env").get("Rewards").get("GoodAlert")
+    assert os.getenv("REWARD_TYPE") in ["CheapFP", "ExpensiveFP"]
+    reward_false_alert = config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("FalseAlert")
+    reward_missed_alert = config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("MissedAlert")
+    reward_good_alert = config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("GoodAlert")
 
     if good_alert:
         return calc_good_alert_reward(current_steps_from_alert, steps_from_alert, reward_good_alert)
@@ -207,20 +205,26 @@ def calc_reward(config: dict,
         return 0
 
 
-def is_missed_alert(next_state_terminal, current_steps_from_alert, steps_from_alert, action):
-    if next_state_terminal and current_steps_from_alert == steps_from_alert and action == 0:
+def is_missed_alert(next_state_terminal, current_steps_from_alert, env_steps_from_alert, action):
+    if next_state_terminal and \
+            action == 0 and \
+            (current_steps_from_alert == env_steps_from_alert or env_steps_from_alert == 1):
         return True
     return False
 
 
-def is_false_alert(next_state_terminal, current_steps_from_alert):
-    if not next_state_terminal and current_steps_from_alert == 1:
-        return True
+def is_false_alert(is_next_state_terminal, current_steps_from_alert, env_steps_from_alert, action):
+    if env_steps_from_alert == 1:
+        if action == 1 and not is_next_state_terminal:
+            return True
+    elif env_steps_from_alert > 1:
+        if action == 0 and current_steps_from_alert == 1 and not is_next_state_terminal:
+            return True
     return False
 
 
 def is_good_alert(next_state_terminal, current_steps_from_alert, steps_from_alert, action):
-    if next_state_terminal and ((current_steps_from_alert < steps_from_alert) or
+    if next_state_terminal and ((current_steps_from_alert < steps_from_alert and action == 0) or
                                 (current_steps_from_alert == steps_from_alert and action == 1)):
         return True
     return False
@@ -233,28 +237,34 @@ def calc_good_alert_reward(current_steps_from_alert, max_steps_from_alert, rewar
 def is_alertable_state(current_node: DecisionNode, max_alert_prediction_steps: int, max_restart_env_iterations: int):
     if all(series_state.steps_from_alert < max_alert_prediction_steps or
            series_state.restart_steps < max_restart_env_iterations
-           for series_state in current_node.state.env_state):
+           for _, series_state in current_node.state.env_state.items()):
         return False
     return True
 
 
 def get_group_state(env_state, group_name):
-    for group_state in env_state:
-        if group_name == group_state.group:
-            return group_state
+    return env_state[group_name]
 
 
 def update_steps_from_alert(current_state_restart,
                             current_state_terminal,
                             current_steps_from_alert,
-                            steps_from_alert,
+                            env_steps_from_alert,
                             action):
-    if not current_state_terminal and not current_state_restart and \
-            (action == 1 or (action == 0 and current_steps_from_alert < steps_from_alert)):
-        current_steps_from_alert -= 1
-        if current_steps_from_alert == 0:
-            current_steps_from_alert = steps_from_alert
-    return current_steps_from_alert
+    next_steps_from_alert = current_steps_from_alert
+    if env_steps_from_alert > 1:
+        if current_state_terminal:
+            next_steps_from_alert = env_steps_from_alert
+
+        else:
+            if not current_state_terminal and not current_state_restart and \
+                    (action == 1 or (action == 0 and current_steps_from_alert < env_steps_from_alert)):
+                next_steps_from_alert = current_steps_from_alert - 1
+
+                if current_steps_from_alert == 0:
+                    next_steps_from_alert = env_steps_from_alert
+
+    return next_steps_from_alert
 
 
 def is_state_terminal(config, group_name, value, current_state_restart=None):
@@ -265,30 +275,33 @@ def is_state_terminal(config, group_name, value, current_state_restart=None):
     return False
 
 
-def update_restart_steps(current_state_terminal: bool, current_restart_steps: int, restart_steps: int):
+def update_restart_steps(current_state_terminal: bool, current_restart_steps: int, env_restart_steps: int):
+    next_restart_steps = current_restart_steps
     if current_state_terminal:
-        return restart_steps - 1 if restart_steps > 1 else restart_steps
+        next_restart_steps = env_restart_steps - 1 if env_restart_steps > 1 else env_restart_steps
 
     else:
-        if is_state_restart(current_restart_steps, restart_steps):
+        if is_state_restart(current_restart_steps, env_restart_steps):
             if current_restart_steps == 0:
-                current_restart_steps = restart_steps
+                next_restart_steps = env_restart_steps
             else:
-                current_restart_steps -= 1
+                next_restart_steps = current_restart_steps - 1
 
-    return current_restart_steps
+    return next_restart_steps
 
 
 def get_group_names(group_name_group_idx_mapping):
     return list(group_name_group_idx_mapping.values())
 
 
-def is_state_restart(restart_steps, max_restart_steps):
-    return restart_steps < max_restart_steps
+def is_state_restart(restart_steps, env_restart_steps):
+    return restart_steps < env_restart_steps
 
 
-def get_num_iterations(test_df, enc_len):
-    num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - enc_len + 3
+def get_num_iterations(config, test_df):
+    enc_len = config.get("EncoderLength")
+    pred_len = config.get("PredictionLength")
+    num_iterations = test_df.time_idx.max() - test_df.time_idx.min() - enc_len - pred_len
     return num_iterations
 
 
@@ -303,7 +316,7 @@ def get_last_val_date(test_df, last_val_time_idx):
     return None
 
 
-def get_steps_from_alert(config):
+def get_env_steps_from_alert(config):
     return config.get("Env").get("AlertMaxPredictionSteps")
 
 
@@ -311,5 +324,5 @@ def get_restart_steps(config):
     return config.get("Env").get("RestartSteps")
 
 
-def get_max_restart_steps(config):
+def get_env_restart_steps(config):
     return get_restart_steps(config) + 1

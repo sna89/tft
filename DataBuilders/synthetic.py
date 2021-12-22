@@ -5,7 +5,7 @@ from DataBuilders.data_builder import DataBuilder
 import numpy as np
 import os
 from config import OBSERVED_KEYWORD, OBSERVED_LB_KEYWORD, OBSERVED_UB_KEYWORD, \
-    NOT_OBSERVED_KEYWORD, NOT_OBSERVED_LB_KEYWORD, NOT_OBSERVED_UB_KEYWORD
+    NOT_OBSERVED_KEYWORD, NOT_OBSERVED_LB_KEYWORD, NOT_OBSERVED_UB_KEYWORD, update_config
 
 
 class SyntheticDataBuilder(DataBuilder):
@@ -23,6 +23,7 @@ class SyntheticDataBuilder(DataBuilder):
     def preprocess(self, data):
         data[self.config.get("GroupKeyword")] = data[self.config.get("GroupKeyword")].astype(str).astype("category")
         self._update_bounds(data)
+        update_config(self.config)
         data = create_bounds_labels(self.config, data)
         return data
 
@@ -62,7 +63,7 @@ class SyntheticDataBuilder(DataBuilder):
 
     @staticmethod
     def _calc_bound_delta(group_quantiles):
-        return abs(group_quantiles[0] - group_quantiles[-1]) * 0.01
+        return abs(group_quantiles[0] - group_quantiles[-1]) * 0.1
 
     def define_regression_ts_ds(self, train_df):
         ts_ds = TimeSeriesDataSet(

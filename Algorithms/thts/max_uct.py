@@ -1,5 +1,6 @@
 from Algorithms.thts.trial_based_heuristic_tree import TrialBasedHeuristicTree
-from Algorithms.thts.node import DecisionNode, ChanceNode
+from Algorithms.thts.thts_helper_functions import backup_decision_full_bellman, backup_chance_monte_carlo
+from Algorithms.thts.node import ChanceNode, DecisionNode
 
 
 class MaxUCT(TrialBasedHeuristicTree):
@@ -7,9 +8,12 @@ class MaxUCT(TrialBasedHeuristicTree):
         super(MaxUCT, self).__init__(env, config)
 
     @staticmethod
-    def _backup_decision_node(decision_node: DecisionNode):
-        decision_node.backup_max_uct()
+    def _backup_decision_node(node: DecisionNode):
+        backup_decision_full_bellman(node)
 
     @staticmethod
-    def _backup_chance_node(chance_node: ChanceNode):
-        chance_node.backup_max_uct()
+    def _backup_chance_node(node: ChanceNode):
+        backup_chance_monte_carlo(node)
+
+
+

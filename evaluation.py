@@ -78,13 +78,17 @@ def get_classification_evaluation_summary(actual, predictions):
     tn, fp, fn, tp = confusion_matrix(actual, predictions).ravel()
     print("TN: {}, FP: {}, FN: {}, TP: {}".format(tn, fp, fn, tp))
 
-    precision = tp / (float(tp + fp))
+    evaluate_classification_from_conf_matrix(tn, fp, fn, tp)
+
+
+def evaluate_classification_from_conf_matrix(tn, fp, fn, tp):
+    precision = tp / (float(tp + fp)) if tp + fp > 0 else 0
     print("Precision: {}".format(precision))
 
-    recall = tp / (float(tp + fn))
+    recall = tp / (float(tp + fn)) if tp + fn > 0 else 0
     print("Recall: {}".format(recall))
 
-    f_score = 2 * (precision * recall) / (precision + recall)
+    f_score = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
     print("F-Score: {}".format(f_score))
 
 

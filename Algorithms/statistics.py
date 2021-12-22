@@ -1,4 +1,4 @@
-from env_thts_common import get_steps_from_alert
+from env_thts_common import get_env_steps_from_alert
 
 
 def init_statistics(group_names):
@@ -18,7 +18,7 @@ def update_statistics(config,
                       statistics,
                       group_reward_mapping,
                       group_name_steps_from_alert_mapping):
-    steps_from_alert = get_steps_from_alert(config)
+    steps_from_alert = get_env_steps_from_alert(config)
 
     for group_name in group_names:
         group_statistics = statistics[group_name]

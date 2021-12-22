@@ -4,7 +4,7 @@ from typing import Dict
 from pytorch_forecasting.models import BaseModel
 from Loss.weighted_cross_entropy import WeightedCrossEntropy
 import os
-from pytorch_forecasting import TemporalFusionTransformer
+from pytorch_forecasting import TemporalFusionTransformer, DeepAR
 from pytorch_forecasting.models.mlp.submodules import FullyConnectedModule
 
 
@@ -25,7 +25,10 @@ class FullyConnectedModel(BaseModel):
         super().__init__(**kwargs)
 
         self.loss = loss
-        self.fitted_model = TemporalFusionTransformer.load_from_checkpoint(os.getenv("CHECKPOINT_REG"))
+        if os.getenv("MODEL_NAME_REG") == "TFT":
+            self.fitted_model = TemporalFusionTransformer.load_from_checkpoint(os.getenv("CHECKPOINT_REG"))
+        elif os.getenv("MODEL_NAME_REG") == "DeepAR":
+            self.fitted_model = DeepAR.load_from_checkpoint(os.getenv("CHECKPOINT_REG"))
 
         # layers = list(self.fitted_model.children())[:-1]
         # self.feature_extractor = nn.Sequential(*layers)

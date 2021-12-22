@@ -49,7 +49,7 @@ def optimize_deepar_hp(train_dl, val_dl, study_pkl_path, study_path):
         train_dl,
         val_dl,
         model_path=study_path,
-        n_trials=100,
+        n_trials=1,
         max_epochs=20
     )
     save_to_pickle(study, study_pkl_path)

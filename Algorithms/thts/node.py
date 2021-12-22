@@ -1,7 +1,4 @@
-from utils import get_argmax_from_list
 import numpy as np
-
-UCT_BIAS = np.sqrt(2)
 
 
 class Node:
@@ -48,22 +45,8 @@ class DecisionNode(Node):
         super(DecisionNode, self).__init__(state, parent)
         self.terminal = terminal
 
-    def select_chance_node(self):
-        successor_nodes_uct_values = [chance_node.uct for chance_node in self.successors]
-        max_idx = get_argmax_from_list(successor_nodes_uct_values, choose_random=True)
-        return self.successors[max_idx]
-
     def is_root(self):
         return self.parent is None
-
-    def backup_max_uct(self):
-        value = 0
-        if not self.terminal:
-            value = max([node.value for node in self.successors])
-        self.value = value
-
-    def backup_dp_uct(self):
-        self.backup_max_uct()
 
     def __eq__(self, other):
         if isinstance(other, DecisionNode):
@@ -76,17 +59,10 @@ class ChanceNode(Node):
         super(ChanceNode, self).__init__(state, parent)
         self._action = action
         self._reward = 0
+        self._reward_group_mapping = {}
 
     @property
-    def uct(self):
-        if self.visits == 0:
-            uct_value = self.calc_heuristic()
-        else:
-            uct_value = UCT_BIAS * np.sqrt(np.log(self.parent.visits) / self.visits) + self.value
-        return uct_value
-
-    @staticmethod
-    def calc_heuristic():
+    def heuristic_value(self):
         return np.Inf
 
     @property
@@ -101,22 +77,13 @@ class ChanceNode(Node):
     def action(self):
         return self._action
 
-    def backup_max_uct(self):
-        nominator = 0
-        for decision_node in self.successors:
-            nominator += decision_node.visits * decision_node.value
+    @property
+    def reward_group_mapping(self):
+        return self._reward_group_mapping
 
-        denominator = self.visits
-        q_value = self.reward + nominator / float(denominator)
-        self.value = q_value
+    @reward_group_mapping.setter
+    def reward_group_mapping(self, reward_group_mapping):
+        self._reward_group_mapping = reward_group_mapping
 
-    def backup_dp_uct(self):
-        nominator = 0
-        sum_explicit_tree_prob = 0
-        for decision_node in self.successors:
-            nominator += decision_node.prob * decision_node.value
-            sum_explicit_tree_prob += decision_node.prob
 
-        q_value = self.reward + nominator / sum_explicit_tree_prob
-        self.value = q_value
 

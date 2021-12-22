@@ -7,7 +7,7 @@ import pandas as pd
 import os
 from config import DATETIME_COLUMN, PLOT
 from data_utils import get_dataloader
-from Models.trainer import get_prediction_mode
+from utils import get_prediction_mode
 
 BASE_FOLDER = os.path.join("tmp", "pycharm_project_99")
 

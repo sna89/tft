@@ -40,18 +40,11 @@ def create_trend(n_series, num_sub_series, num_correlated, timesteps, type_="lin
 
     trends_list = []
     for i in range(num_sub_series):
-        trends = None
         if not num_correlated:
-            if type_ == "linear":
-                trends = np.random.normal(loc=loc, scale=scale, size=n_series)[:, None] / timesteps
-            elif type_ == "quadratic":
-                trends = np.random.normal(size=n_series)[:, None] / timesteps ** 2
+            trends = np.random.normal(loc=loc, scale=scale, size=n_series)[:, None] / timesteps
         else:
-            if type_ == "linear":
-                trends = create_correlated_normal_series(n_series, num_correlated, loc=loc, scale=scale)[:,
-                         None] / timesteps
-            elif type_ == "quadratic":
-                trends = create_correlated_normal_series(n_series, num_correlated)[:, None] / timesteps ** 2
+            trends = create_correlated_normal_series(n_series, num_correlated, loc=loc, scale=scale)[:,
+                     None] / timesteps
         trends_list.append(trends)
     return trends_list
 

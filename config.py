@@ -1,6 +1,8 @@
 import os
-import multiprocessing
-import numpy as np
+from utils import save_to_pickle, load_pickle
+
+PKL_FOLDER = "pkl"
+CONFIG_PKL_FILE = "config.pkl"
 
 OBSERVED_KEYWORD = "Observed"
 NOT_OBSERVED_KEYWORD = "NotObserved"
@@ -42,37 +44,57 @@ def init_base_folders():
         os.mkdir(STUDY)
     if not os.path.isdir(PLOT):
         os.mkdir(PLOT)
-    if not os.path.isdir('pkl'):
-        os.mkdir('pkl')
+    if not os.path.isdir(PKL_FOLDER):
+        os.mkdir(PKL_FOLDER)
 
 
-def init_dataset_folders(dataset_name):
-    dataset_path = os.path.join(DATA, dataset_name)
-
+def init_study_folders(dataset_name, model_name):
     study_path = os.path.join(STUDY, dataset_name)
     study_reg_path = os.path.join(study_path, REGRESSION_FOLDER)
     study_class_path = os.path.join(study_path, CLASSIFICATION_FOLDER)
     study_combined_path = os.path.join(study_path, COMBINED_FOLDER)
 
+    if not os.path.isdir(study_path):
+        os.mkdir(study_path)
+
+    if not os.path.isdir(study_reg_path):
+        os.mkdir(study_reg_path)
+
+    study_reg_model_path = os.path.join(study_reg_path, model_name)
+    if not os.path.isdir(study_reg_model_path):
+        os.mkdir(study_reg_model_path)
+
+    if not os.path.isdir(study_class_path):
+        os.mkdir(study_class_path)
+
+    study_class_model_path = os.path.join(study_class_path, model_name)
+    if not os.path.isdir(study_class_model_path):
+        os.mkdir(study_class_model_path)
+
+    if not os.path.isdir(study_combined_path):
+        os.mkdir(study_combined_path)
+
+    study_combined_model_path = os.path.join(study_combined_path, model_name)
+    if not os.path.isdir(study_combined_model_path):
+        os.mkdir(study_combined_model_path)
+
+
+def init_dataset_folders(dataset_name, model_name):
+    dataset_path = os.path.join(DATA, dataset_name)
     plot_path = os.path.join(PLOT, dataset_name)
 
     if not os.path.isdir(dataset_path):
         os.mkdir(dataset_path)
-    if not os.path.isdir(study_path):
-        os.mkdir(study_path)
-    if not os.path.isdir(study_reg_path):
-        os.mkdir(study_reg_path)
-    if not os.path.isdir(study_class_path):
-        os.mkdir(study_class_path)
-    if not os.path.isdir(study_combined_path):
-        os.mkdir(study_combined_path)
+
     if not os.path.isdir(plot_path):
         os.mkdir(plot_path)
 
+    init_study_folders(dataset_name, model_name)
 
-def get_config(dataset_name):
+
+def get_config(dataset_name, model_name):
     init_base_folders()
-    init_dataset_folders(dataset_name)
+    init_dataset_folders(dataset_name, model_name)
 
     dataset_config = {
         "Electricity": {
@@ -86,9 +108,9 @@ def get_config(dataset_name):
         },
         "Fisherman": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Fisherman'),
-            "TestDataFramePicklePath": os.path.join('pkl', 'fisherman_test_df.pkl'),
-            "ValDataFramePicklePath": os.path.join('pkl', 'fisherman_val_df.pkl'),
-            "GroupMappingPicklePath": os.path.join('pkl', 'fisherman_group_mapping.pkl'),
+            "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'fisherman_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join(PKL_FOLDER, 'fisherman_val_df.pkl'),
+            "GroupMappingPicklePath": os.path.join(PKL_FOLDER, 'fisherman_group_mapping.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman', REGRESSION_FOLDER),
             "EncoderLength": 144,
             "PredictionLength": 6,
@@ -100,9 +122,9 @@ def get_config(dataset_name):
         },
         "Fisherman2": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Fisherman2'),
-            "TestDataFramePicklePath": os.path.join('pkl', 'fisherman2_test_df.pkl'),
-            "ValDataFramePicklePath": os.path.join('pkl', 'fisherman2_val_df.pkl'),
-            "GroupMappingPicklePath": os.path.join('pkl', 'fisherman2_group_mapping.pkl'),
+            "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'fisherman2_test_df.pkl'),
+            "ValDataFramePicklePath": os.path.join(PKL_FOLDER, 'fisherman2_val_df.pkl'),
+            "GroupMappingPicklePath": os.path.join(PKL_FOLDER, 'fisherman2_group_mapping.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Fisherman2', REGRESSION_FOLDER),
             "EncoderLength": 72,
             "PredictionLength": 6,
@@ -116,14 +138,14 @@ def get_config(dataset_name):
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
-            "Filename": "SyntheticDataset.csv",
-            "TestDataFramePicklePath": os.path.join('pkl', 'synthetic_test_df.pkl'),
-            "TestTsDsPicklePath": os.path.join('pkl', 'synthetic_test_ts_ds.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER),
-            "StudyClassPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', CLASSIFICATION_FOLDER),
-            "StudyCombinedPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', COMBINED_FOLDER),
+            "Filename": "SyntheticData_Version_0_Correlated_0.csv",
+            "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_df.pkl'),
+            "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_ts_ds.pkl'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER, model_name),
+            "StudyClassPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', CLASSIFICATION_FOLDER, model_name),
+            "StudyCombinedPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', COMBINED_FOLDER, model_name),
             "EncoderLength": 400,
-            "PredictionLength": 7,
+            "PredictionLength": 14,
             "GroupKeyword": "Series",
             "ValueKeyword": "Value",
             "ObservedBoundKeyword": "ObservedBound",
@@ -135,9 +157,9 @@ def get_config(dataset_name):
         },
         "Straus": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
-            "TestDataFramePicklePath": os.path.join('pkl', 'straus_test_df.pkl'),
-            "TestTsDsPicklePath": os.path.join('pkl', 'straus_test_ts_ds.pkl'),
-            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER),
+            "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'straus_test_df.pkl'),
+            "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'straus_test_ts_ds.pkl'),
+            "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER, model_name),
             "GroupKeyword": "key",
             "GroupColumns": ['PartId', 'OrderStepId'],
             # "ValueKeyword": "ActualValue",
@@ -179,48 +201,7 @@ def get_config(dataset_name):
     anomaly_config = {
         "AnomalyConfig":
             {
-                "Synthetic": {
-                    "0": {
-                        "lb": -2.9,
-                        "hb": 3.6,
-                    },
-                    "1": {
-                        "lb": -1.8,
-                        "hb": 1.8,
-                    },
-                    "2": {
-                        "lb": -3,
-                        "hb": 3.5,
-                    },
-                    "3": {
-                        "lb": -2,
-                        "hb": 11.5,
-                    },
-                    "4": {
-                        "lb": -2,
-                        "hb": 3.9,
-                    },
-                    "5": {
-                        "lb": -4.8,
-                        "hb": 3.5,
-                    },
-                    "6": {
-                        "lb": -2,
-                        "hb": 8.5,
-                    },
-                    "7": {
-                        "lb": -12.8,
-                        "hb": 4,
-                    },
-                    "8": {
-                        "lb": -1.5,
-                        "hb": 1.1,
-                    },
-                    "9": {
-                        "lb": -1,
-                        "hb": 2.2,
-                    },
-                },
+                "Synthetic": {},
                 "Fisherman": {
                     "U100330": {
                         "lb": -16.7225,
@@ -262,22 +243,37 @@ def get_config(dataset_name):
 
             },
         "Env": {
-            "ConsecutiveExceptions": 3,
-            "AlertMaxPredictionSteps": 4,
-            "RestartSteps": 0,
+            "ConsecutiveExceptions": 1,
+            "AlertMaxPredictionSteps": 1,
+            "RestartSteps": 10,
             "Rewards": {
-                "MissedAlert": -1000,
-                "FalseAlert": -100,
-                "GoodAlert": 50,
+                "CheapFP": {
+                    "MissedAlert": -1000,
+                    "FalseAlert": -10,
+                    "GoodAlert": 50,
+                },
+                "ExpensiveFP": {
+                    "MissedAlert": -1000,
+                    "FalseAlert": -100,
+                    "GoodAlert": 50,
+                }
             }
         },
         "THTS": {
-            "NumTrials": 500,
-            "TrialLength": 6
+            "NumTrials": 100,
+            "TrialLength": 3
         }
 
     }
 
     config = dict(dict(dataset_config[dataset_name], **train_config), **anomaly_config)
-
+    update_config(config)
     return config
+
+
+def load_config():
+    return load_pickle(os.path.join(PKL_FOLDER, CONFIG_PKL_FILE))
+
+
+def update_config(config):
+    save_to_pickle(config, os.path.join(PKL_FOLDER, CONFIG_PKL_FILE))

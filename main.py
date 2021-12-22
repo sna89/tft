@@ -17,8 +17,9 @@ pd.set_option('display.max_columns', None)
 
 if __name__ == '__main__':
     dataset_name = os.getenv("DATASET")
+    model_name = os.getenv("MODEL_NAME_REG")
 
-    config = get_config(dataset_name)
+    config = get_config(dataset_name, model_name)
 
     data = build_data(config, dataset_name)
     data = process_data(config, dataset_name, data)
@@ -34,7 +35,7 @@ if __name__ == '__main__':
                                                 train_df,
                                                 val_df,
                                                 test_df,
-                                                evaluate=True,
+                                                evaluate=False,
                                                 plot=False)
 
     if os.getenv("CLASS_TASK") == "True":
@@ -52,10 +53,11 @@ if __name__ == '__main__':
                          train_df,
                          test_df)
 
-    # run_thts_task(config,
-    #               dataset_name,
-    #               train_df,
-    #               test_df)
+    if os.getenv("THTS_TASK") == "True":
+        run_thts_task(config,
+                      dataset_name,
+                      train_df,
+                      test_df)
 
     if os.getenv("APPLY_ANOMALY_DETECTION") == "True":
         detector = AnomalyDetection(config, os.getenv("MODEL_NAME_REG"), dataset_name, fitted_reg_model)
