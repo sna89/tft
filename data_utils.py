@@ -162,12 +162,5 @@ def is_group_prediction_out_of_bound(group_prediction, lb, ub):
         return False, -1
 
 
-def flatten_nested_list(nl):
-    flat_list = []
-    for sublist in nl:
-        for item in sublist:
-            flat_list.append(item)
-    return flat_list
-
 
 

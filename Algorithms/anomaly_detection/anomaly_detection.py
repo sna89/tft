@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from config import DATETIME_COLUMN, PLOT
 from DataBuilders.build import convert_df_to_ts_data
-from data_utils import get_dataloader, flatten_nested_list
+from data_utils import get_dataloader
+from utils import flatten_nested_list
 from plot import plot_single_prediction
 import torch
 from evaluation import get_classification_evaluation_summary

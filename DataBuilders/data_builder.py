@@ -1,11 +1,7 @@
 from abc import ABC
 from pytorch_forecasting import TimeSeriesDataSet
-from utils import load_pickle
-import os
 import pandas as pd
-import numpy as np
-from config import DATETIME_COLUMN, \
-    REGRESSION_TASK_TYPE, \
+from config import REGRESSION_TASK_TYPE, \
     CLASSIFICATION_TASK_TYPE,\
     COMBINED_TASK_TYPE, \
     ROLLOUT_TASK_TYPE

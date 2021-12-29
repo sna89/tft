@@ -1,5 +1,5 @@
 import pandas as pd
-from env_thts_common import get_num_iterations, get_group_names, \
+from EnvCommon.env_thts_common import get_num_iterations, get_group_names_from_df, \
      calc_reward, is_state_terminal, get_env_steps_from_alert, get_env_restart_steps
 import os
 import numpy as np
@@ -25,7 +25,7 @@ class TrajectorySample:
         self.num_trajectories = num_trajectories
 
         self.group_idx_mapping = get_group_id_group_name_mapping(self.config, self.deepar_model, test_df)
-        self.group_names = get_group_names(self.group_idx_mapping)
+        self.group_names = get_group_names_from_df(self.group_idx_mapping)
 
         self.actions = [0, 1]
         self.group_action_product_dict = self._define_actions()
@@ -124,21 +124,21 @@ class TrajectorySample:
                                                  false_alert=False,
                                                  missed_alert=True,
                                                  current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
-                                                 steps_from_alert=self.steps_from_alert)
+                                                 env_steps_from_alert=self.steps_from_alert)
                         elif action == 1 and out_of_bound:
                             reward = calc_reward(self.config,
                                                  good_alert=True,
                                                  false_alert=False,
                                                  missed_alert=False,
                                                  current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
-                                                 steps_from_alert=self.steps_from_alert)
+                                                 env_steps_from_alert=self.steps_from_alert)
                         elif action == 1 and not out_of_bound:
                             reward = calc_reward(self.config,
                                                  good_alert=False,
                                                  false_alert=True,
                                                  missed_alert=False,
                                                  current_steps_from_alert=self.steps_from_alert - out_of_bound_idx,
-                                                 steps_from_alert=self.steps_from_alert)
+                                                 env_steps_from_alert=self.steps_from_alert)
                         score += reward
                     group_action_scores.append(score)
             else:
@@ -209,14 +209,14 @@ class TrajectorySample:
                                               false_alert=True,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              steps_from_alert=self.steps_from_alert)
+                                              env_steps_from_alert=self.steps_from_alert)
                     else:
                         reward += calc_reward(config=self.config,
                                               good_alert=True,
                                               false_alert=False,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              steps_from_alert=self.steps_from_alert)
+                                              env_steps_from_alert=self.steps_from_alert)
 
             elif 1 < group_steps_from_alert < self.steps_from_alert:
                 next_state_group_restart_mapping[group_name] = False
@@ -229,7 +229,7 @@ class TrajectorySample:
                                           false_alert=False,
                                           missed_alert=False,
                                           current_steps_from_alert=group_steps_from_alert,
-                                          steps_from_alert=self.steps_from_alert)
+                                          env_steps_from_alert=self.steps_from_alert)
 
             else:
                 if action == 0:
@@ -243,7 +243,7 @@ class TrajectorySample:
                                               false_alert=False,
                                               missed_alert=True,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              steps_from_alert=self.steps_from_alert)
+                                              env_steps_from_alert=self.steps_from_alert)
 
                 elif action == 1:
                     next_state_group_restart_mapping[group_name] = False
@@ -256,7 +256,7 @@ class TrajectorySample:
                                               false_alert=False,
                                               missed_alert=False,
                                               current_steps_from_alert=group_steps_from_alert,
-                                              steps_from_alert=self.steps_from_alert)
+                                              env_steps_from_alert=self.steps_from_alert)
 
             reward_group_mapping[group_name] = reward
 

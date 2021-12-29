@@ -87,9 +87,9 @@ def get_loss(task_type="reg", model_name="TFT", weights=None, num_targets=1):
         loss, output_size = get_regression_loss()
 
     elif task_type == COMBINED_TASK_TYPE and model_name == "TFT":
-        loss = MultiLoss([QuantileLoss([0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]),
+        loss = MultiLoss([QuantileLoss(QUANTILES),
                           WeightedCrossEntropy(weights)], weights=None)
-        output_size = [7, 2]
+        output_size = [len(QUANTILES), 2]
 
     elif task_type == CLASSIFICATION_TASK_TYPE:
         if model_name == "Mlp":
@@ -108,9 +108,10 @@ def get_loss(task_type="reg", model_name="TFT", weights=None, num_targets=1):
 
 
 def get_regression_loss():
-    loss = QuantileLoss([0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99])
-    output_size = 7
+    loss = QuantileLoss(QUANTILES)
+    output_size = len(QUANTILES)
     return loss, output_size
+
 
 def get_num_targets(ts_ds):
     return len(ts_ds.target_names)

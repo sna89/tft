@@ -4,8 +4,8 @@ from Algorithms.thts.node import ChanceNode, DecisionNode
 
 
 class DpUCT(TrialBasedHeuristicTree):
-    def __init__(self, env, config):
-        super(DpUCT, self).__init__(env, config)
+    def __init__(self, config, env, predictor, group_name):
+        super(DpUCT, self).__init__(config, env, predictor, group_name)
 
     @staticmethod
     def _backup_decision_node(node: DecisionNode):

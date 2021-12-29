@@ -3,7 +3,7 @@ import pandas as pd
 from typing import List, Dict
 import os
 from config import PLOT
-from env_thts_common import get_last_val_time_idx
+from EnvCommon.env_thts_common import get_last_val_time_idx
 
 
 def add_group_y_value_plot(config, fig, test_df, group_name, time_idx_list):
@@ -61,43 +61,42 @@ def add_group_step_decision_to_plot(config,
 
 
 def render(config,
-           group_names,
+           env_group_name,
            test_df: pd.DataFrame(),
-           action_history: List[Dict],
-           reward_history: List[Dict],
-           terminal_history: List[Dict],
-           restart_history: List[Dict],
-           alert_prediction_steps_history: List[Dict],
-           restart_steps_history: List[Dict]):
+           action_history: List[int],
+           reward_history: List[float],
+           terminal_history: List[bool],
+           restart_history: List[bool],
+           alert_prediction_steps_history: List[int],
+           restart_steps_history: List[int]):
 
     min_test_time_idx = get_last_val_time_idx(config, test_df)
     time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
 
-    for group_name in group_names:
-        fig = go.Figure()
-        fig = add_group_y_value_plot(config, fig, test_df, group_name, time_idx_list)
+    fig = go.Figure()
+    fig = add_group_y_value_plot(config, fig, test_df, env_group_name, time_idx_list)
 
-        current_time_idx_list = list(time_idx_list[:len(action_history)])
-        for idx, time_idx in enumerate(current_time_idx_list):
-            reward = reward_history[idx][group_name]
-            action = action_history[idx][group_name]
-            terminal = terminal_history[idx][group_name]
-            restart = restart_history[idx][group_name]
-            steps_from_alert = alert_prediction_steps_history[idx][group_name]
-            restart_steps = restart_steps_history[idx][group_name]
+    current_time_idx_list = list(time_idx_list[:len(action_history)])
+    for idx, time_idx in enumerate(current_time_idx_list):
+        reward = reward_history[idx]
+        action = action_history[idx]
+        terminal = terminal_history[idx]
+        restart = restart_history[idx]
+        steps_from_alert = alert_prediction_steps_history[idx]
+        restart_steps = restart_steps_history[idx]
 
-            fig = add_group_step_decision_to_plot(config,
-                                                  fig,
-                                                  test_df,
-                                                  group_name,
-                                                  time_idx,
-                                                  reward,
-                                                  action,
-                                                  terminal,
-                                                  restart,
-                                                  steps_from_alert,
-                                                  restart_steps)
+        fig = add_group_step_decision_to_plot(config,
+                                              fig,
+                                              test_df,
+                                              env_group_name,
+                                              time_idx,
+                                              reward,
+                                              action,
+                                              terminal,
+                                              restart,
+                                              steps_from_alert,
+                                              restart_steps)
 
-        fig.update_xaxes(title_text="<b>time_idx</b>")
-        fig.update_yaxes(title_text="<b>Actual</b>")
-        fig.write_html(os.path.join(PLOT, 'render_synthetic_{}.html'.format(group_name)))
+    fig.update_xaxes(title_text="<b>time_idx</b>")
+    fig.update_yaxes(title_text="<b>Actual</b>")
+    fig.write_html(os.path.join(PLOT, 'render_synthetic_{}.html'.format(env_group_name)))

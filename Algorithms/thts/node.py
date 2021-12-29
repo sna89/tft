@@ -1,4 +1,3 @@
-import numpy as np
 
 
 class Node:
@@ -6,7 +5,7 @@ class Node:
         self._state = state
         self.parent = parent
         self._value = 0
-        self.visits = 0
+        self._visits = 0
 
         self._successors = []
 
@@ -33,17 +32,47 @@ class Node:
     def state(self, new_state):
         self._state = new_state
 
+    @property
+    def visits(self):
+        return self._visits
+
     def visit(self):
-        self.visits += 1
+        self._visits += 1
 
     def is_first_visit(self):
-        return self.visits == 1
+        return self._visits == 1
 
 
 class DecisionNode(Node):
-    def __init__(self, state, parent=None, terminal=False):
+    def __init__(self, state, parent=None, terminal=False, quantile_idx=-1):
         super(DecisionNode, self).__init__(state, parent)
-        self.terminal = terminal
+        self._terminal = terminal
+        self._quantile_idx = quantile_idx
+        self._prediction = None
+
+    @property
+    def terminal(self):
+        return self._terminal
+
+    @terminal.setter
+    def terminal(self, terminal):
+        self._terminal = terminal
+
+    @property
+    def quantile_idx(self):
+        return self._quantile_idx
+
+    @quantile_idx.setter
+    def quantile_idx(self, quantile_idx):
+        self._quantile_idx = quantile_idx
+
+    @property
+    def prediction(self):
+        return self._prediction
+
+    @prediction.setter
+    def prediction(self, prediction):
+        self._prediction = prediction
 
     def is_root(self):
         return self.parent is None
@@ -59,11 +88,12 @@ class ChanceNode(Node):
         super(ChanceNode, self).__init__(state, parent)
         self._action = action
         self._reward = 0
-        self._reward_group_mapping = {}
 
-    @property
-    def heuristic_value(self):
-        return np.Inf
+    def get_successor(self, quantile):
+        for decision_node in self.successors:
+            if decision_node.quantile_idx == quantile:
+                return decision_node
+        return None
 
     @property
     def reward(self):
@@ -76,14 +106,5 @@ class ChanceNode(Node):
     @property
     def action(self):
         return self._action
-
-    @property
-    def reward_group_mapping(self):
-        return self._reward_group_mapping
-
-    @reward_group_mapping.setter
-    def reward_group_mapping(self, reward_group_mapping):
-        self._reward_group_mapping = reward_group_mapping
-
 
 

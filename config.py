@@ -1,4 +1,5 @@
 import os
+import pathlib
 from utils import save_to_pickle, load_pickle
 
 PKL_FOLDER = "pkl"
@@ -19,7 +20,8 @@ DATETIME_COLUMN = "Date"
 DATA = "Data"
 DATA_BASE_FOLDER = os.path.join(DATA)
 
-PLOT = "Plots"
+path = pathlib.Path(__file__).parent.resolve()
+PLOT = os.path.join(path, "Plots")
 PLOT = os.path.join(PLOT)
 
 STUDY = "Study"
@@ -35,6 +37,8 @@ COMBINED_TASK_TYPE = "combined"
 COMBINED_FOLDER = "Combined"
 
 ROLLOUT_TASK_TYPE = "rollout"
+
+QUANTILES = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
 
 
 def init_base_folders():
@@ -140,7 +144,7 @@ def get_config(dataset_name, model_name):
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
             "Filename": "SyntheticData_Version_0_Correlated_0.csv",
             "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_df.pkl'),
-            "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_ts_ds.pkl'),
+            "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_train_df.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER, model_name),
             "StudyClassPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', CLASSIFICATION_FOLDER, model_name),
             "StudyCombinedPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', COMBINED_FOLDER, model_name),
@@ -260,7 +264,7 @@ def get_config(dataset_name, model_name):
             }
         },
         "THTS": {
-            "NumTrials": 100,
+            "NumTrials": 500,
             "TrialLength": 3
         }
 
@@ -271,9 +275,41 @@ def get_config(dataset_name, model_name):
     return config
 
 
-def load_config():
-    return load_pickle(os.path.join(PKL_FOLDER, CONFIG_PKL_FILE))
+def load_config(path):
+    return load_pickle(os.path.join(path, PKL_FOLDER, CONFIG_PKL_FILE))
 
 
 def update_config(config):
     save_to_pickle(config, os.path.join(PKL_FOLDER, CONFIG_PKL_FILE))
+
+
+def get_env_steps_from_alert(config):
+    return config.get("Env").get("AlertMaxPredictionSteps")
+
+
+def get_restart_steps(config):
+    return config.get("Env").get("RestartSteps")
+
+
+def get_env_restart_steps(config):
+    return get_restart_steps(config) + 1
+
+
+def get_false_alert_reward(config):
+    return config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("FalseAlert")
+
+
+def get_missed_alert_reward(config):
+    return config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("MissedAlert")
+
+
+def get_good_alert_reward(config):
+    return config.get("Env").get("Rewards").get(os.getenv("REWARD_TYPE")).get("GoodAlert")
+
+
+def get_tree_depth(config):
+    return config.get("THTS").get("TrialLength")
+
+
+def get_num_quantiles():
+    return len(QUANTILES)

@@ -27,8 +27,10 @@ def get_argmax_from_list(l: List, choose_random=True):
     return max_indices
 
 
-def set_env_to_state(env, state):
-    env._current_state = state
+def create_chunks(l, chunk_size):
+    n = len(l)
+    for i in range(0, n, chunk_size):
+        yield l[i: i + chunk_size]
 
 
 def get_model_from_trainer(trainer, model_name):
@@ -58,5 +60,13 @@ def get_prediction_mode():
     else:
         raise ValueError
     return mode
+
+
+def flatten_nested_list(nl):
+    flat_list = []
+    for sublist in nl:
+        for item in sublist:
+            flat_list.append(item)
+    return flat_list
 
 
