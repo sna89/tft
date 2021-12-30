@@ -62,13 +62,13 @@ if __name__ == '__main__':
 
         group_names = get_group_names_from_df(config, train_df)
 
-        if False:
-            PARALLEL_GROUPS = 10
-            for group_names_chunk in create_chunks(group_names, PARALLEL_GROUPS):
-                with concurrent.futures.ProcessPoolExecutor() as executor:
-                    executor.map(run_thts_task_for_group, group_names_chunk)
-        else:
-            run_thts_task_for_group(group_names[0])
+        # if False:
+        # PARALLEL_GROUPS = 5
+        # for group_names_chunk in create_chunks(group_names, PARALLEL_GROUPS):
+        #     with concurrent.futures.ProcessPoolExecutor() as executor:
+        #         executor.map(run_thts_task_for_group, group_names_chunk)
+        # else:
+        run_thts_task_for_group(group_names[9])
 
     if os.getenv("APPLY_ANOMALY_DETECTION") == "True":
         detector = AnomalyDetection(config, os.getenv("MODEL_NAME_REG"), dataset_name, fitted_reg_model)

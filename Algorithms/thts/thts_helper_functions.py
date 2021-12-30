@@ -13,7 +13,21 @@ from data_utils import get_group_lower_and_upper_bounds
 UCT_BIAS = np.sqrt(2)
 
 
-def calc_out_of_bound_probability_estimation(lb, ub, group_prediction_step):
+def calc_out_of_lb_probability_estimation(lb, group_prediction_step, q_idx):
+    return ((lb - group_prediction_step[q_idx]) /
+            (group_prediction_step[q_idx + 1] - group_prediction_step[q_idx])) * \
+           (QUANTILES[q_idx + 1] - QUANTILES[q_idx]) + \
+           (QUANTILES[q_idx])
+
+
+def calc_out_of_ub_probability_estimation(ub, group_prediction_step, q_idx):
+    return ((group_prediction_step[q_idx + 1] - ub) /
+            (group_prediction_step[q_idx + 1] - group_prediction_step[q_idx])) * \
+           (QUANTILES[q_idx + 1] - QUANTILES[q_idx]) + \
+           (1 - QUANTILES[q_idx + 1])
+
+
+def estimate_out_of_bound_step_probability(lb, ub, group_prediction_step):
     num_quantiles = get_num_quantiles()
     lq, uq = group_prediction_step[0], group_prediction_step[-1]
     if lb < lq and uq < ub:
@@ -23,9 +37,10 @@ def calc_out_of_bound_probability_estimation(lb, ub, group_prediction_step):
     else:
         for q_idx in range(num_quantiles - 1):
             if group_prediction_step[q_idx] <= lb <= group_prediction_step[q_idx + 1]:
-                return (QUANTILES[q_idx + 1] + QUANTILES[q_idx]) / 2
+                return calc_out_of_lb_probability_estimation(lb, group_prediction_step, q_idx)
+
             elif group_prediction_step[q_idx] <= ub <= group_prediction_step[q_idx + 1]:
-                return 1 - (QUANTILES[q_idx + 1] + QUANTILES[q_idx]) / 2
+                return calc_out_of_ub_probability_estimation(ub, group_prediction_step, q_idx)
 
 
 def get_prediction_quantile(group_prediction):
@@ -44,6 +59,14 @@ def run_heuristic_wait(config, group_name, steps, prediction_quantile, group_pre
     return value
 
 
+def estimate_out_of_bound_probability(probabilities, current_probability):
+    out_of_bound_probability = 1
+    for p in probabilities:
+        out_of_bound_probability *= (1 - p)
+    out_of_bound_probability *= current_probability
+    return out_of_bound_probability
+
+
 def run_heuristic(config, chance_node: ChanceNode, prediction, group_name):
     group_prediction = prediction[group_name]
     prediction_quantile = get_prediction_quantile(group_prediction)
@@ -60,15 +83,26 @@ def run_heuristic(config, chance_node: ChanceNode, prediction, group_name):
         lb, ub = get_group_lower_and_upper_bounds(config, group_name)
 
         values = []
+        out_of_bound_probabilities = []
         for step in range(env_steps_from_alert):
             group_prediction_step = group_prediction[step]
-            out_of_bound_probability_estimation = calc_out_of_bound_probability_estimation(lb, ub, group_prediction_step)
-
+            out_of_bound_step_p_estimation = estimate_out_of_bound_step_probability(lb,
+                                                                                    ub,
+                                                                                    group_prediction_step)
+            out_of_bound_p_estimation = estimate_out_of_bound_probability(out_of_bound_probabilities,
+                                                                          out_of_bound_step_p_estimation)
             step_good_alert_reward = calc_good_alert_reward(step, env_steps_from_alert, good_alert_reward)
-            step_value = out_of_bound_probability_estimation * step_good_alert_reward + \
-                         (1 - out_of_bound_probability_estimation) * false_alert_reward
+            if step < env_steps_from_alert - 1:
+                step_value = out_of_bound_p_estimation * step_good_alert_reward
+            elif step == env_steps_from_alert - 1:
+                step_value = out_of_bound_p_estimation * step_good_alert_reward + \
+                             (1 - out_of_bound_p_estimation) * false_alert_reward
 
             values.append(step_value)
+            out_of_bound_probabilities.append(out_of_bound_step_p_estimation)
+
+            if out_of_bound_p_estimation == 1:
+                break
 
         if tree_depth > env_steps_from_alert:
             steps = tree_depth - env_steps_from_alert
@@ -77,7 +111,7 @@ def run_heuristic(config, chance_node: ChanceNode, prediction, group_name):
             values.append(wait_value)
             values.extend([0] * (steps - 1))
 
-        value = sum(values) / len(values)
+        value = sum(values)
 
     chance_node.value = value
 
@@ -103,7 +137,7 @@ def backup_chance_monte_carlo(node: ChanceNode):
         nominator += decision_node.visits * decision_node.value
 
     denominator = node.visits
-    q_value = node.reward + nominator / float(denominator)
+    q_value = node.reward + nominator / float(denominator) if denominator > 0 else node.reward
     node.value = q_value
 
 

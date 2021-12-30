@@ -5,7 +5,7 @@ from torch import Tensor
 from Algorithms.thts.node import DecisionNode
 from data_utils import get_group_lower_and_upper_bounds
 from config import DATETIME_COLUMN, get_env_steps_from_alert, get_env_restart_steps, get_false_alert_reward, \
-    get_missed_alert_reward, get_good_alert_reward
+    get_missed_alert_reward, get_good_alert_reward, get_num_quantiles
 import pandas as pd
 
 
@@ -57,7 +57,6 @@ def build_group_next_state(config,
                            action,
                            group_name,
                            is_env_group=False):
-
     if is_env_group:
         is_group_current_state_restart = is_state_restart(group_current_state.restart_steps,
                                                           env_restart_steps)
@@ -144,15 +143,15 @@ def build_next_state(env_name,
     return next_state, is_group_next_terminal, is_group_next_restart
 
 
-def get_reward(env_name,
-               config,
-               group_name,
-               next_state_terminal,
-               current_state,
-               env_steps_from_alert,
-               env_restart_steps,
-               action: int,
-               ) \
+def get_reward_from_env(env_name,
+                        config,
+                        group_name,
+                        next_state_terminal,
+                        current_state,
+                        env_steps_from_alert,
+                        env_restart_steps,
+                        action: int,
+                        ) \
         -> Union[Dict, float]:
     assert env_name in ["simulation", "real"]
 
@@ -181,6 +180,22 @@ def get_reward(env_name,
                          env_steps_from_alert)
 
     return reward
+
+
+def get_reward_for_alert_from_prediction(config,
+                                         group_name,
+                                         prediction,
+                                         env_steps_from_alert):
+    group_prediction = prediction[group_name]
+    prediction_quantile = get_num_quantiles() // 2
+    lb, ub = get_group_lower_and_upper_bounds(config, group_name)
+    for step_from_alert in range(env_steps_from_alert):
+        step_group_prediction = group_prediction[step_from_alert][prediction_quantile]
+        if step_group_prediction < lb or step_group_prediction > ub:
+            reward_good_alert = get_good_alert_reward(config)
+            return calc_good_alert_reward(step_from_alert, env_steps_from_alert, reward_good_alert)
+
+    return get_false_alert_reward(config)
 
 
 def get_reward_type_for_group(group_current_steps_from_alert: int,
@@ -256,13 +271,6 @@ def calc_good_alert_reward(current_steps_from_alert, env_steps_from_alert, rewar
     return reward_good_alert * (env_steps_from_alert - (current_steps_from_alert - 1))
 
 
-def is_alertable_state(current_node: DecisionNode, env_steps_from_alert: int, env_restart_steps: int, group_name):
-    group_state = current_node.state.env_state[group_name]
-    if group_state.steps_from_alert < env_steps_from_alert or group_state.restart_steps < env_restart_steps:
-        return False
-    return True
-
-
 def get_group_state(env_state, group_name):
     return env_state[group_name]
 
@@ -282,7 +290,7 @@ def update_steps_from_alert(current_state_restart,
                     (action == 1 or (action == 0 and current_steps_from_alert < env_steps_from_alert)):
                 next_steps_from_alert = current_steps_from_alert - 1
 
-                if current_steps_from_alert == 0:
+                if next_steps_from_alert == 0:
                     next_steps_from_alert = env_steps_from_alert
 
     return next_steps_from_alert

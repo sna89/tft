@@ -1,10 +1,10 @@
 from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
-
 from data_utils import reverse_key_value_mapping
 from utils import get_argmax_from_list
-from EnvCommon.env_thts_common import get_reward, build_next_state, EnvState, is_alertable_state, \
-    get_group_state, get_num_iterations, get_last_val_time_idx, set_env_state, set_env_group
+from EnvCommon.env_thts_common import get_reward_from_env, build_next_state, EnvState, \
+    get_group_state, get_num_iterations, get_last_val_time_idx, set_env_state, set_env_group, \
+    get_reward_for_alert_from_prediction
 import time
 import pandas as pd
 import numpy as np
@@ -121,7 +121,6 @@ class TrialBasedHeuristicTree:
                 evaluate_classification_from_conf_matrix(tn, fp, fn, tp)
 
     def select_chance_node_from_decision_node(self, decision_node: DecisionNode):
-        executed_heuristic = False
         if len(decision_node.successors) == 1:
             return decision_node.successors[0]
 
@@ -132,12 +131,11 @@ class TrialBasedHeuristicTree:
                                                        self.tree_group_name),
                      decision_node.successors))
             max_idx = get_argmax_from_list([chance_node.value for chance_node in decision_node.successors])
-            executed_heuristic = True
         else:
             successor_nodes_uct_values = [uct(chance_node) for chance_node in decision_node.successors]
             max_idx = get_argmax_from_list(successor_nodes_uct_values, choose_random=True)
 
-        return decision_node.successors[max_idx], executed_heuristic
+        return decision_node.successors[max_idx]
 
     @staticmethod
     def select_decision_node_from_chance_node(node: ChanceNode):
@@ -152,11 +150,11 @@ class TrialBasedHeuristicTree:
 
     def _choose_action(self, current_node: DecisionNode):
         action = 0
-        if is_alertable_state(current_node,
-                              self.env.env_steps_from_alert,
-                              self.env.env_restart_steps,
-                              self.tree_group_name):
-            for trial in range(self.num_trials):
+        if self.is_alertable_state(current_node,
+                                   self.env.env_steps_from_alert,
+                                   self.env.env_restart_steps,
+                                   self.tree_group_name):
+            for _ in range(self.num_trials):
                 self._run_trial(current_node)
             action = self.select_max_value_action(current_node)
         return action
@@ -187,7 +185,7 @@ class TrialBasedHeuristicTree:
             else:
                 prediction = decision_node.prediction
 
-            chance_node, executed_heuristic = self.select_chance_node_from_decision_node(decision_node)  # select action
+            chance_node = self.select_chance_node_from_decision_node(decision_node)  # select action
             self._visit_chance_node(chance_node, prediction, depth)
 
         self._backup_decision_node(decision_node)
@@ -197,22 +195,32 @@ class TrialBasedHeuristicTree:
         if self.consider_trial_length and depth == self.trial_length - 1:
             terminal = True
 
-        chance_node.visit()
+        if chance_node.action == 0:
+            chance_node.visit()
 
-        chosen_quantile = self._draw_decision_node_quantile()
-        decision_node = chance_node.get_successor(chosen_quantile)
+            chosen_quantile = self._draw_decision_node_quantile()
+            decision_node = chance_node.get_successor(chosen_quantile)
 
-        if chance_node.is_first_visit() or not decision_node:
-            sampled_prediction = self.predictor.sample_from_prediction(prediction, self.tree_group_id, chosen_quantile)
-            next_state = self._create_next_state(chance_node, sampled_prediction)
-            decision_node = self.add_decision_node(next_state,
-                                                   chance_node,
-                                                   chosen_quantile=chosen_quantile,
-                                                   terminal=terminal)
-        else:
-            decision_node.terminal = terminal
+            if chance_node.is_first_visit() or not decision_node:
+                sampled_prediction = self.predictor.sample_from_prediction(prediction, self.tree_group_id,
+                                                                           chosen_quantile)
+                next_state, reward = self._create_next_state(chance_node, sampled_prediction)
+                chance_node.reward = reward
+                decision_node = self.add_decision_node(next_state,
+                                                       chance_node,
+                                                       chosen_quantile=chosen_quantile,
+                                                       terminal=terminal)
+            else:
+                decision_node.terminal = terminal
+            self._visit_decision_node(decision_node, depth + 1, terminal)
 
-        self._visit_decision_node(decision_node, depth + 1, terminal)
+        elif chance_node.action == 1:
+            reward = get_reward_for_alert_from_prediction(self.config,
+                                                          self.tree_group_name,
+                                                          prediction,
+                                                          self.env.env_steps_from_alert)
+            chance_node.reward = reward
+
         self._backup_chance_node(chance_node)
 
     def _create_next_state(self, chance_node: ChanceNode, prediction):
@@ -220,8 +228,7 @@ class TrialBasedHeuristicTree:
         set_env_group(self.env, self.tree_group_name)
 
         next_state, reward = self.env.step(chance_node.action, prediction)  # monte carlo sample
-        chance_node.reward = reward
-        return next_state
+        return next_state, reward
 
     def _expand_decision_node(self, decision_node: DecisionNode):
         feasible_actions = self._get_feasible_actions_for_node(decision_node)
@@ -230,9 +237,11 @@ class TrialBasedHeuristicTree:
 
     def _get_feasible_actions_for_node(self, decision_node: DecisionNode):
         actions = list(range(self.num_actions))
-        if not is_alertable_state(decision_node, self.env.env_steps_from_alert, self.env.env_restart_steps,
-                                  self.tree_group_name):
-            actions.remove(1)
+        # if not self.is_alertable_state(decision_node,
+        #                                self.env.env_steps_from_alert,
+        #                                self.env.env_restart_steps,
+        #                                self.tree_group_name):
+        #     actions.remove(1)
         return actions
 
     @staticmethod
@@ -294,14 +303,14 @@ class TrialBasedHeuristicTree:
                                                                                self.env.env_restart_steps,
                                                                                action)
 
-        reward = get_reward(self.env_name,
-                            self.config,
-                            self.tree_group_name,
-                            next_state_terminal,
-                            current_state,
-                            self.env.env_steps_from_alert,
-                            self.env.env_restart_steps,
-                            action)
+        reward = get_reward_from_env(self.env_name,
+                                     self.config,
+                                     self.tree_group_name,
+                                     next_state_terminal,
+                                     current_state,
+                                     self.env.env_steps_from_alert,
+                                     self.env.env_restart_steps,
+                                     action)
 
         return next_state, next_state_terminal, next_state_restart, reward
 
@@ -316,6 +325,13 @@ class TrialBasedHeuristicTree:
             if successor_decision_node.quantile_idx == chosen_quantile:
                 return True
         return False
+
+    @staticmethod
+    def is_alertable_state(current_node: DecisionNode, env_steps_from_alert: int, env_restart_steps: int, group_name):
+        group_state = current_node.state.env_state[group_name]
+        if group_state.steps_from_alert < env_steps_from_alert or group_state.restart_steps < env_restart_steps:
+            return False
+        return True
 
     def _run_prediction(self, decision_node: DecisionNode):
         prediction = self.predictor.predict(decision_node.state)

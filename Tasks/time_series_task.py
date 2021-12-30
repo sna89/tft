@@ -4,7 +4,7 @@ from evaluation import evaluate_regression, evaluate_classification, evaluate_co
 from plot import plot_reg_predictions
 from Loss.weighted_cross_entropy import WeightedCrossEntropy
 from pytorch_forecasting import QuantileLoss, MultiLoss
-from config import CLASSIFICATION_TASK_TYPE, REGRESSION_TASK_TYPE, COMBINED_TASK_TYPE
+from config import CLASSIFICATION_TASK_TYPE, REGRESSION_TASK_TYPE, COMBINED_TASK_TYPE, QUANTILES
 import pandas as pd
 import os
 

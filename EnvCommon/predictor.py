@@ -1,7 +1,9 @@
 import datetime
+import os
+from DataBuilders.build import convert_df_to_ts_data
 from EnvCommon.env_thts_common import get_last_val_time_idx, get_last_val_date, get_num_series
-from config import DATETIME_COLUMN
-from data_utils import get_group_id_group_name_mapping, add_dt_columns
+from config import DATETIME_COLUMN, REGRESSION_TASK_TYPE
+from data_utils import get_group_id_group_name_mapping, add_dt_columns, get_dataloader, reverse_key_value_mapping
 from config import get_num_quantiles
 from utils import get_prediction_mode
 import numpy as np
@@ -20,6 +22,7 @@ class Predictor:
         self.init_prediction_df = self.test_df[self.test_df.time_idx <= self.last_val_time_idx]
 
         self.group_id_group_name_mapping = get_group_id_group_name_mapping(self.config, self.test_ts_ds)
+        self.group_name_group_id_mapping = reverse_key_value_mapping(self.group_id_group_name_mapping)
 
         self.num_quantiles = get_num_quantiles()
         self.num_series = get_num_series(self.config, self.test_df)
@@ -29,6 +32,7 @@ class Predictor:
 
         prediction_mode = get_prediction_mode()
         model_prediction, x = self.forecasting_model.predict(prediction_df, mode=prediction_mode, return_x=True)
+
         if (isinstance(model_prediction, dict) and "prediction" in model_prediction) or \
                 (isinstance(model_prediction, tuple) and "prediction" in model_prediction.keys()):
             model_prediction = model_prediction["prediction"]
@@ -54,8 +58,8 @@ class Predictor:
         prediction_df.reset_index(drop=True, inplace=True)
         return prediction_df
 
-    def _add_sample_to_data(self, new_data, value, series, idx_diff):
-        data = {self.config.get("GroupKeyword"): series,
+    def _add_sample_to_data(self, new_data, value, group, idx_diff):
+        data = {self.config.get("GroupKeyword"): group,
                 self.config.get("ValueKeyword"): value,
                 DATETIME_COLUMN: self.last_val_date + datetime.timedelta(
                     hours=idx_diff) if self.last_val_date else None,
@@ -72,12 +76,13 @@ class Predictor:
             dummy_data = self.test_df[lambda x: x.time_idx == self.last_val_time_idx].to_dict('records')
         else:
             dummy_data = new_data[-self.num_series:]
-        idx_diff = len(current_state.env_state[first_env_state_group_name].history) + 1
 
-        for sample in dummy_data:
-            series = sample[self.config.get("GroupKeyword")]
-            value = sample[self.config.get("ValueKeyword")]
-            new_data = self._add_sample_to_data(new_data, value, series, idx_diff)
+        for decoder_step in range(self.config.get("PredictionLength")):
+            idx_diff = len(current_state.env_state[first_env_state_group_name].history) + 1 + decoder_step
+            for sample in dummy_data:
+                group = sample[self.config.get("GroupKeyword")]
+                value = sample[self.config.get("ValueKeyword")]
+                new_data = self._add_sample_to_data(new_data, value, group, idx_diff)
 
         return new_data
 
@@ -96,7 +101,8 @@ class Predictor:
         quantile_idx_list = np.random.randint(low=1, high=self.num_quantiles - 1, size=self.num_series)
         quantile_idx_list[group_id] = chosen_quantile
 
-        for group_id, (group_name, group_prediction) in enumerate(model_prediction.items()):
+        for _, (group_name, group_prediction) in enumerate(model_prediction.items()):
+            group_id = self.group_name_group_id_mapping[group_name]
             sampled_prediction[group_name] = group_prediction[0][quantile_idx_list[group_id]]
 
         return sampled_prediction

@@ -46,33 +46,36 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
     dataloader = get_dataloader(ts_ds, False, config)
 
     prediction_mode = get_prediction_mode()
-    model_predictions, x = model.predict(dataloader, mode="prediction", return_x=True, show_progress_bar=True)
+    model_predictions, x = model.predict(dataloader, mode=prediction_mode, return_x=True, show_progress_bar=True)
 
     index_df = dataloader.dataset.x_to_index(x)
 
-    # if model_name == "TFT":
-    #     plot_groups_attention(config, index_df, model_predictions, os.getenv("DATASET"))
+    if model_name == "TFT":
+        plot_groups_attention(config, index_df, model_predictions, os.getenv("DATASET"))
 
-    # if model_name == "TFT":
-    #     interpretation = model.interpret_output(model_predictions, reduction="sum", attention_prediction_horizon=0)
-    #     figs = model.plot_interpretation(interpretation)
-    #     figs['attention'].figure.savefig(os.path.join(PLOT, dataset_name, 'attention.png'))
-    #     figs['static_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'static_variables.png'))
-    #     figs['encoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'encoder_variables.png'))
-    #     figs['decoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'decoder_variables.png'))
-    #
-    # if model_name == "TFT":
-    #     predictions = model_predictions['prediction']
-    #     interpretation = model.interpret_output(model_predictions, attention_prediction_horizon=0)
-    #
-    # elif model_name == "DeepAR":
-    #     predictions = model_predictions
+    if model_name == "TFT":
+        interpretation = model.interpret_output(model_predictions, reduction="sum", attention_prediction_horizon=0)
+        figs = model.plot_interpretation(interpretation)
+        figs['attention'].figure.savefig(os.path.join(PLOT, dataset_name, 'attention.png'))
+        figs['static_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'static_variables.png'))
+        figs['encoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'encoder_variables.png'))
+        figs['decoder_variables'].figure.savefig(os.path.join(PLOT, dataset_name, 'decoder_variables.png'))
 
-    idx_list = list(range(index_df.index.min(), index_df.index.max(), config.get("PredictionLength")))
+    if model_name == "TFT":
+        predictions = model_predictions['prediction']
+        interpretation = model.interpret_output(model_predictions, attention_prediction_horizon=0)
 
-    interpretation = None
+    elif model_name == "DeepAR":
+        predictions = model_predictions
+
+    else:
+        raise ValueError
+    idx_list = list(range(index_df[index_df[config.get("GroupKeyword")] == "9"].index.min(),
+                          index_df[index_df[config.get("GroupKeyword")] == "9"].index.max(),
+                          config.get("PredictionLength")))
+
     for idx in idx_list:
-        plot_single_prediction(config, df, index_df, idx, model_predictions, x, model_name, dataset_name, interpretation)
+        plot_single_prediction(config, df, index_df, idx, predictions, x, model_name, dataset_name, interpretation)
 
 
 def plot_single_prediction(config, df, index_df, idx, predictions, x, model_name, dataset_name, interpretation=None):
@@ -107,39 +110,38 @@ def plot_single_prediction(config, df, index_df, idx, predictions, x, model_name
         secondary_y=False,
     )
 
-    # prediction_idx = predictions[0].shape[1] // 2
-    # prediction = predictions[idx][:, prediction_idx]
-    prediction = predictions[idx]
+    prediction_idx = predictions[0].shape[1] // 2
+    prediction = predictions[idx][:, prediction_idx]
     fig.add_trace(
         go.Scatter(x=x_values_pred, y=prediction, name="Prediction", line=dict(color='firebrick', width=4)),
         secondary_y=False,
     )
 
-    # if model_name == "TFT" and interpretation:
-    #     attention = interpretation["attention"][idx]
-    #     fig.add_trace(
-    #         go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='lightgrey')),
-    #         secondary_y=True,
-    #     )
+    if model_name == "TFT" and interpretation:
+        attention = interpretation["attention"][idx]
+        fig.add_trace(
+            go.Scatter(x=x_values_enc, y=attention, name="Attention", line=dict(color='lightgrey')),
+            secondary_y=True,
+        )
 
-    # y_lower_quantile = predictions[idx][:, 0]
-    # fig.add_trace(
-    #     go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile",
-    #                line=dict(color='grey', dash='dash')),
-    #     secondary_y=False,
-    # )
-    #
-    # y_upper_quantile = predictions[idx][:, -1]
-    # fig.add_trace(
-    #     go.Scatter(x=x_values_pred, y=y_upper_quantile, name="Upper Quantile", line=dict(color='grey', dash='dash'),
-    #                fill='tonexty'),
-    #     secondary_y=False,
-    # )
+    y_lower_quantile = predictions[idx][:, 0]
+    fig.add_trace(
+        go.Scatter(x=x_values_pred, y=y_lower_quantile, name="Lower Quantile",
+                   line=dict(color='grey', dash='dash')),
+        secondary_y=False,
+    )
+
+    y_upper_quantile = predictions[idx][:, -1]
+    fig.add_trace(
+        go.Scatter(x=x_values_pred, y=y_upper_quantile, name="Upper Quantile", line=dict(color='grey', dash='dash'),
+                   fill='tonexty'),
+        secondary_y=False,
+    )
 
     fig.update_xaxes(title_text="<b>Time</b>")
     fig.update_yaxes(title_text="<b>Actual VS Prediction</b>", secondary_y=False)
-    # if model_name == "TFT":
-    #     fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
+    if model_name == "TFT":
+        fig.update_yaxes(title_text="<b>Attention</b>", secondary_y=True)
     fig.update_layout(height=800, width=1400)
 
     fig.write_image(os.path.join(PLOT,

@@ -248,7 +248,7 @@ def get_config(dataset_name, model_name):
             },
         "Env": {
             "ConsecutiveExceptions": 1,
-            "AlertMaxPredictionSteps": 1,
+            "AlertMaxPredictionSteps": 2,
             "RestartSteps": 10,
             "Rewards": {
                 "CheapFP": {
@@ -265,7 +265,7 @@ def get_config(dataset_name, model_name):
         },
         "THTS": {
             "NumTrials": 500,
-            "TrialLength": 3
+            "TrialLength": 4
         }
 
     }

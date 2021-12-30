@@ -1,4 +1,4 @@
-from EnvCommon.env_thts_common import get_reward, build_next_state, EnvState, get_last_val_time_idx, \
+from EnvCommon.env_thts_common import get_reward_from_env, build_next_state, EnvState, get_last_val_time_idx, \
     get_env_steps_from_alert, get_env_restart_steps, \
     get_group_names_from_df, get_num_series, build_state_from_df_time_idx
 from data_utils import get_group_id_group_name_mapping
@@ -60,14 +60,14 @@ class AdEnv:
                                                                  self.env_restart_steps,
                                                                  action)
 
-        reward = get_reward(self.env_name,
-                            self.config,
-                            self.env_group_name,
-                            is_next_state_terminal,
-                            self.current_state,
-                            self.env_steps_from_alert,
-                            self.env_restart_steps,
-                            action)
+        reward = get_reward_from_env(self.env_name,
+                                     self.config,
+                                     self.env_group_name,
+                                     is_next_state_terminal,
+                                     self.current_state,
+                                     self.env_steps_from_alert,
+                                     self.env_restart_steps,
+                                     action)
 
         return next_state, reward
 
