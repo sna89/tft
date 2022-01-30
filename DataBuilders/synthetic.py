@@ -30,7 +30,8 @@ class SyntheticDataBuilder(DataBuilder):
     def _update_bounds(self, data):
         self.config['AnomalyConfig'][os.getenv("DATASET")] = {}
         groups = pd.unique(data[self.config.get("GroupKeyword")])
-        train_val_ratio = self.config.get("Train").get("TrainRatio") + self.config.get("Train").get("ValRatio")
+        train_val_ratio = self.config.get("Train").get(os.getenv("DATASET")).get("TrainRatio") + \
+                          self.config.get("Train").get(os.getenv("DATASET")).get("ValRatio")
         max_val_time_idx = int(data['time_idx'].max() * train_val_ratio)
         for group in groups:
             group_quantiles = np.quantile(

@@ -49,6 +49,11 @@ class EnvState:
     #     return False
 
 
+def clear_env_state_history(env_state: EnvState):
+    for group_name, group_state in env_state.env_state.items():
+        group_state.history.clear()
+
+
 def build_group_next_state(config,
                            group_next_state_value,
                            group_current_state,

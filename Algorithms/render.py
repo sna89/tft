@@ -99,4 +99,4 @@ def render(config,
 
     fig.update_xaxes(title_text="<b>time_idx</b>")
     fig.update_yaxes(title_text="<b>Actual</b>")
-    fig.write_html(os.path.join(PLOT, 'render_synthetic_{}.html'.format(env_group_name)))
+    fig.write_html(os.path.join(PLOT, os.getenv("DATASET"), 'render_synthetic_{}.html'.format(env_group_name)))

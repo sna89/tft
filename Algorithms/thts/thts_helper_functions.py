@@ -4,7 +4,6 @@ from EnvCommon.env_thts_common import is_out_of_bounds, calc_good_alert_reward
 from config import get_missed_alert_reward, \
     get_good_alert_reward, \
     get_false_alert_reward, \
-    get_tree_depth, \
     get_env_steps_from_alert, \
     QUANTILES, \
     get_num_quantiles
@@ -49,13 +48,69 @@ def get_prediction_quantile(group_prediction):
     return prediction_quantile
 
 
-def run_heuristic_wait(config, group_name, steps, prediction_quantile, group_prediction):
-    value = 0
-    for step in range(steps):
-        depth_prediction = group_prediction[step][prediction_quantile]
-        if is_out_of_bounds(config, group_name, depth_prediction):
-            value = get_missed_alert_reward(config)
+def run_heuristic_wait(config, group_name, steps, group_prediction):
+    missed_alert_reward = get_missed_alert_reward(config)
+    lb, ub = get_group_lower_and_upper_bounds(config, group_name)
 
+    values = []
+    out_of_bound_probabilities = []
+    for step in range(steps):
+        group_prediction_step = group_prediction[step]
+        out_of_bound_step_p_estimation = estimate_out_of_bound_step_probability(lb,
+                                                                                ub,
+                                                                                group_prediction_step)
+        out_of_bound_p_estimation = estimate_out_of_bound_probability(out_of_bound_probabilities,
+                                                                      out_of_bound_step_p_estimation)
+        out_of_bound_probabilities.append(out_of_bound_step_p_estimation)
+        step_value = out_of_bound_p_estimation * missed_alert_reward
+        values.append(step_value)
+
+        if out_of_bound_p_estimation == 1:
+            break
+
+    value = sum(values)
+    return value
+
+
+def run_heuristic_action(config, group_name, steps, group_prediction):
+    good_alert_reward = get_good_alert_reward(config)
+    false_alert_reward = get_false_alert_reward(config)
+    env_steps_from_alert = get_env_steps_from_alert(config)
+    lb, ub = get_group_lower_and_upper_bounds(config, group_name)
+
+    values = []
+    out_of_bound_probabilities = []
+    for step in range(env_steps_from_alert):
+        group_prediction_step = group_prediction[step]
+        out_of_bound_step_p_estimation = estimate_out_of_bound_step_probability(lb,
+                                                                                ub,
+                                                                                group_prediction_step)
+        out_of_bound_p_estimation = estimate_out_of_bound_probability(out_of_bound_probabilities,
+                                                                      out_of_bound_step_p_estimation)
+        out_of_bound_probabilities.append(out_of_bound_step_p_estimation)
+
+        step_good_alert_reward = calc_good_alert_reward(step, env_steps_from_alert, good_alert_reward)
+
+        if step < env_steps_from_alert - 1:
+            step_value = out_of_bound_p_estimation * step_good_alert_reward
+
+        elif step == env_steps_from_alert - 1:
+            step_value = out_of_bound_p_estimation * step_good_alert_reward + \
+                         (1 - out_of_bound_p_estimation) * false_alert_reward
+
+        values.append(step_value)
+
+        if out_of_bound_p_estimation == 1:
+            break
+
+    if steps > env_steps_from_alert:
+        remaining_steps = steps - env_steps_from_alert
+        group_prediction = group_prediction[env_steps_from_alert:]
+        wait_value = run_heuristic_wait(config, group_name, remaining_steps, group_prediction)
+        values.append(wait_value)
+        values.extend([0] * (remaining_steps - 1))
+
+    value = sum(values)
     return value
 
 
@@ -67,51 +122,15 @@ def estimate_out_of_bound_probability(probabilities, current_probability):
     return out_of_bound_probability
 
 
-def run_heuristic(config, chance_node: ChanceNode, prediction, group_name):
+def run_heuristic(config, chance_node, steps, prediction, group_name):
     group_prediction = prediction[group_name]
-    prediction_quantile = get_prediction_quantile(group_prediction)
-    tree_depth = get_tree_depth(config)
-
     value = 0
+
     if chance_node.action == 0:
-        chance_node.value = run_heuristic_wait(config, group_name, tree_depth, prediction_quantile, group_prediction)
+        value = run_heuristic_wait(config, group_name, steps, group_prediction)
 
     elif chance_node.action == 1:
-        good_alert_reward = get_good_alert_reward(config)
-        false_alert_reward = get_false_alert_reward(config)
-        env_steps_from_alert = get_env_steps_from_alert(config)
-        lb, ub = get_group_lower_and_upper_bounds(config, group_name)
-
-        values = []
-        out_of_bound_probabilities = []
-        for step in range(env_steps_from_alert):
-            group_prediction_step = group_prediction[step]
-            out_of_bound_step_p_estimation = estimate_out_of_bound_step_probability(lb,
-                                                                                    ub,
-                                                                                    group_prediction_step)
-            out_of_bound_p_estimation = estimate_out_of_bound_probability(out_of_bound_probabilities,
-                                                                          out_of_bound_step_p_estimation)
-            step_good_alert_reward = calc_good_alert_reward(step, env_steps_from_alert, good_alert_reward)
-            if step < env_steps_from_alert - 1:
-                step_value = out_of_bound_p_estimation * step_good_alert_reward
-            elif step == env_steps_from_alert - 1:
-                step_value = out_of_bound_p_estimation * step_good_alert_reward + \
-                             (1 - out_of_bound_p_estimation) * false_alert_reward
-
-            values.append(step_value)
-            out_of_bound_probabilities.append(out_of_bound_step_p_estimation)
-
-            if out_of_bound_p_estimation == 1:
-                break
-
-        if tree_depth > env_steps_from_alert:
-            steps = tree_depth - env_steps_from_alert
-            group_prediction = group_prediction[env_steps_from_alert:]
-            wait_value = run_heuristic_wait(config, group_name, steps, prediction_quantile, group_prediction)
-            values.append(wait_value)
-            values.extend([0] * (steps - 1))
-
-        value = sum(values)
+        value = run_heuristic_action(config, group_name, steps, group_prediction)
 
     chance_node.value = value
 

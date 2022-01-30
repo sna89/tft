@@ -17,6 +17,8 @@ PLANT_MODEL_ID = 2629
 MIN_DATETIME = datetime.datetime(day=1, month=4, year=2021)
 MAX_DATETIME = datetime.datetime(day=1, month=7, year=2021)
 QMP_FILTER_LIST = [6, 9, 11, 14, 19, 26, 53]
+QMP_ID_NIGHT_MODE = 19
+NIGHT_MODE_THRESHOLD_VALUE = 40
 UNPLANNED_STOPPAGE_TYPE_ID = 4
 MIN_STOPPAGE_DURATION = timedelta(minutes=15)
 
@@ -28,13 +30,14 @@ class StrausDataBuilder(DataBuilder):
 
     def build_data(self):
         qmp_log_df, order_log_df, stoppage_log_df, stoppage_event_df, temp_index_df = self.read_files()
+        qmp_log_df = self.filter_night_mode(qmp_log_df)
         qmp_order_log_df = self.join_qmp_order_log_data(qmp_log_df, order_log_df)
         stoppage_log_event_df = self.join_stoppage_log_event_data(stoppage_log_df, stoppage_event_df)
         stoppage_log_event_df = self.process_joined_stoppage_data(stoppage_log_event_df)
         qmp_order_log_df = self.add_stoppage_ind_to_qmp_order_log_data(qmp_order_log_df, stoppage_log_event_df)
-        qmp_order_log_df = self.add_temp_index_to_qmp_order_log_data(qmp_order_log_df, temp_index_df)
+        # qmp_order_log_df = self.add_temp_index_to_qmp_order_log_data(qmp_order_log_df, temp_index_df)
         self._create_key_column(qmp_order_log_df)
-        for group_col in self.config.get("GroupColumns") + [KEY_COLUMN] + ["QmpId"]:
+        for group_col in self.config.get("GroupColumns") + [KEY_COLUMN]:
             qmp_order_log_df[group_col] = qmp_order_log_df[group_col].astype(str).astype("category")
         # self._get_bounds(filename, data)
         qmp_order_log_df.drop_duplicates(subset=["QmpId", "PartId", "OrderStepId", DATETIME_COLUMN], inplace=True)
@@ -61,16 +64,24 @@ class StrausDataBuilder(DataBuilder):
             file_path = os.path.join(self.config.get("Path"), filename)
             if 'QmpLog_data' in filename:
                 df = self.read_qmp_log_file(file_path)
+                df = self.filter_qmp_df(df)
                 qmp_log_data_list.append(df)
+
             elif 'StoppageLog_data' in filename:
                 df = self.read_stoppage_log_file(file_path)
+                df = self.filter_stoppage_df(df)
                 stoppage_log_data_list.append(df)
+
             elif 'OrderStepLog_data' in filename:
                 df = self.read_order_log_file(file_path)
+                df = self.filter_order_log_df(df)
                 order_log_data_list.append(df)
+
             elif 'StoppageEvent_data' in filename:
                 df = self.read_stoppage_event_file(file_path)
+                df = self.filter_stoppage_event_df(df)
                 stoppage_event_data_list.append(df)
+
             elif "TempIndex" in filename:
                 temp_index_df = self.read_temp_index_file(file_path)
 
@@ -108,11 +119,14 @@ class StrausDataBuilder(DataBuilder):
 
     @staticmethod
     def read_qmp_log_file(file_path):
-        raw_df = pd.read_csv(file_path)
-        df = StrausDataBuilder.filter_by_plant_model_id(raw_df)
-        df.drop(columns=['PlantModelId', 'SpValue'], inplace=True)
+        df = pd.read_csv(file_path)
         df[DATETIME_COLUMN] = pd.to_datetime(df['TimeStmp'])
-        df = df.drop(columns=['TimeStmp'], axis=1)
+        df = df.drop(columns=['TimeStmp', 'SpValue'], axis=1)
+        return df
+
+    @staticmethod
+    def filter_qmp_df(df):
+        df = StrausDataBuilder.filter_by_plant_model_id(df)
         df = StrausDataBuilder.filter_by_qmp(df)
         df = StrausDataBuilder.filter_df_by_dt(df, DATETIME_COLUMN)
         # df = StrausDataBuilder.agg_mean_qmp_by_qmp_order_step(df)
@@ -156,21 +170,29 @@ class StrausDataBuilder(DataBuilder):
     @staticmethod
     def read_stoppage_log_file(file_path):
         df = pd.read_csv(file_path)
-        df = df[df.PlantModelId == PLANT_MODEL_ID]
-        df.drop(columns=['PlantModelId', 'BlamePlantModelId'], inplace=True)
         df['ActualStrTime'] = pd.to_datetime(df['ActualStrTime'])
         df['ActualEndTime'] = pd.to_datetime(df['ActualEndTime'])
+        return df
+
+    @staticmethod
+    def filter_stoppage_df(df):
+        df = StrausDataBuilder.filter_by_plant_model_id(df)
+        df.drop(columns=['PlantModelId', 'BlamePlantModelId'], inplace=True)
         df = StrausDataBuilder.filter_df_by_dt(df, 'ActualStrTime')
         return df
 
     @staticmethod
     def read_order_log_file(file_path):
         df = pd.read_csv(file_path)
-        df = df[df.PlantModelId == PLANT_MODEL_ID]
-        df.drop(columns=['PlantModelId', 'OrderStepIdentity', 'ActualSetupTime', 'SetupTime', 'UomId'],
-                inplace=True)
         df['ActualStrTime'] = pd.to_datetime(df['ActualStrTime'])
         df['ActualEndTime'] = pd.to_datetime(df['ActualEndTime'])
+        return df
+
+    @staticmethod
+    def filter_order_log_df(df):
+        df = StrausDataBuilder.filter_by_plant_model_id(df)
+        df.drop(columns=['PlantModelId', 'OrderStepIdentity', 'ActualSetupTime', 'SetupTime', 'UomId'],
+                inplace=True)
         df = StrausDataBuilder.filter_df_by_dt(df, "ActualStrTime")
         return df
 
@@ -179,6 +201,10 @@ class StrausDataBuilder(DataBuilder):
         df = pd.read_csv(file_path)
         df = df.fillna(0)
         df = df.astype({"StoppageType": int})
+        return df
+
+    @staticmethod
+    def filter_stoppage_event_df(df):
         df = df[df.StoppageType == UNPLANNED_STOPPAGE_TYPE_ID]
         df.drop(columns=['StoppageEventName', 'StoppageTypeName', "StoppageType"],
                 inplace=True)
@@ -207,6 +233,19 @@ class StrausDataBuilder(DataBuilder):
 
         qmp_order_log_df.dropna(inplace=True)
         return qmp_order_log_df
+
+    def filter_night_mode(self, qmp_log_df):
+        filter_df = qmp_log_df[qmp_log_df["QmpId"] == QMP_ID_NIGHT_MODE]
+        filter_df = filter_df[filter_df[self.config.get("ValueKeyword")] > NIGHT_MODE_THRESHOLD_VALUE]
+        filter_df['TimeDiff'] = filter_df[DATETIME_COLUMN] - filter_df[DATETIME_COLUMN].shift(1)
+        filter_df['TimeDiff'] = filter_df['TimeDiff'].fillna(timedelta(hours=2))
+        dt_to_filter_list = pd.to_datetime(filter_df[filter_df['TimeDiff'] >= timedelta(hours=1)][DATETIME_COLUMN])
+        for dt_to_filter in dt_to_filter_list:
+            start_dt = dt_to_filter + timedelta(hours=-1)
+            end_dt = dt_to_filter + timedelta(hours=1)
+            mask_index = qmp_log_df[(qmp_log_df[DATETIME_COLUMN] < start_dt) | (qmp_log_df[DATETIME_COLUMN] > end_dt)].index
+            qmp_log_df = qmp_log_df.loc[mask_index]
+        return qmp_log_df
 
     @staticmethod
     def add_stoppage_ind_to_qmp_order_log_data(qmp_order_log_df, stoppage_log_event_df):
@@ -283,9 +322,8 @@ class StrausDataBuilder(DataBuilder):
     @staticmethod
     def _create_key_column(data):
         data[KEY_COLUMN] = data['PartId'].astype(str) + KEY_DELIMITER + \
-                           data['OrderStepId'].astype(int).astype(str)
-        # + KEY_DELIMITER + \
-                           # data['QmpId'].astype(int).astype(str)
+                           data['OrderStepId'].astype(int).astype(str) + KEY_DELIMITER + \
+                           data['QmpId'].astype(int).astype(str)
 
     def _get_bounds(self, filename, data):
         if 'CI_QmpLog_data' in filename:
@@ -351,7 +389,8 @@ class StrausDataBuilder(DataBuilder):
             add_encoder_length=False,
             allow_missing_timesteps=True,
             categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True),
-                                  **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in self.config.get("DatetimeAdditionalColumns")}},
+                                  **{dt_col: NaNLabelEncoder(add_nan=True) for dt_col in
+                                     self.config.get("DatetimeAdditionalColumns")}},
             # target_normalizer=MultiNormalizer([NaNLabelEncoder(add_nan=True), NaNLabelEncoder(add_nan=True)])
             # target_normalizer=NaNLabelEncoder(add_nan=True)
         )
@@ -384,51 +423,51 @@ class StrausDataBuilder(DataBuilder):
         )
         return straus_train_ts_ds
 
-    # def split_train_val_test(self, data: pd.DataFrame()):
-    #     np.random.seed(42)
-    #
-    #     train_df_list = []
-    #     val_df_list = []
-    #
-    #     date_index = pd.DatetimeIndex(data[DATETIME_COLUMN])
-    #     date_index_total_time = date_index.max() - date_index.min()
-    #     test_time_start_dt = date_index.min() + date_index_total_time * (self.train_ratio + self.val_ratio)
-    #
-    #     test_df = data[lambda x: x[DATETIME_COLUMN] >= test_time_start_dt]
-    #     data = data[lambda x: x[DATETIME_COLUMN] < test_time_start_dt]
-    #
-    #     encoder_len = self.config.get("EncoderLength")
-    #     prediction_len = self.config.get("PredictionLength")
-    #     groups = pd.unique(data[self.config.get("GroupKeyword")])
-    #     for i, group in enumerate(groups):
-    #         sub_df = data[data[self.config.get("GroupKeyword")] == group]
-    #         time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
-    #         if time_idx_delta <= encoder_len + prediction_len:
-    #             continue
-    #
-    #         random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
-    #                                                                sub_df.time_idx.max() - prediction_len),
-    #                                                      size=(5, 2)))
-    #         for time_idx in random_time_idx_list:
-    #             train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
-    #                                   & (sub_df.time_idx <= time_idx[0] + prediction_len)]
-    #             val_sub_df = sub_df[(sub_df.time_idx >= time_idx[1] - encoder_len)
-    #                                 & (sub_df.time_idx <= time_idx[1] + prediction_len)]
-    #
-    #             train_df_list.append(train_sub_df)
-    #             val_df_list.append(val_sub_df)
-    #
-    #     train_df = pd.concat(train_df_list, axis=0)
-    #     val_df = pd.concat(val_df_list, axis=0)
-    #
-    #     train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-    #         sort_values('time_idx'). \
-    #         reset_index(drop=True)
-    #     val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-    #         sort_values('time_idx'). \
-    #         reset_index(drop=True)
-    #     test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
-    #         sort_values('time_idx'). \
-    #         reset_index(drop=True)
-    #
-    #     return train_df, val_df, test_df
+    def split_train_val_test(self, data: pd.DataFrame()):
+        np.random.seed(42)
+
+        train_df_list = []
+        val_df_list = []
+
+        date_index = pd.DatetimeIndex(data[DATETIME_COLUMN])
+        date_index_total_time = date_index.max() - date_index.min()
+        test_time_start_dt = date_index.min() + date_index_total_time * (self.train_ratio + self.val_ratio)
+
+        test_df = data[lambda x: x[DATETIME_COLUMN] >= test_time_start_dt]
+        data = data[lambda x: x[DATETIME_COLUMN] < test_time_start_dt]
+
+        encoder_len = self.config.get("EncoderLength")
+        prediction_len = self.config.get("PredictionLength")
+        groups = pd.unique(data[self.config.get("GroupKeyword")])
+        for i, group in enumerate(groups):
+            sub_df = data[data[self.config.get("GroupKeyword")] == group]
+            time_idx_delta = sub_df.time_idx.max() - sub_df.time_idx.min()
+            if time_idx_delta <= encoder_len + prediction_len:
+                continue
+
+            random_time_idx_list = list(np.random.choice(np.arange(sub_df.time_idx.min() + encoder_len,
+                                                                   sub_df.time_idx.max() - prediction_len),
+                                                         size=(5, 2)))
+            for time_idx in random_time_idx_list:
+                train_sub_df = sub_df[(sub_df.time_idx >= time_idx[0] - encoder_len)
+                                      & (sub_df.time_idx <= time_idx[0] + prediction_len)]
+                val_sub_df = sub_df[(sub_df.time_idx >= time_idx[1] - encoder_len)
+                                    & (sub_df.time_idx <= time_idx[1] + prediction_len)]
+
+                train_df_list.append(train_sub_df)
+                val_df_list.append(val_sub_df)
+
+        train_df = pd.concat(train_df_list, axis=0)
+        val_df = pd.concat(val_df_list, axis=0)
+
+        train_df = train_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+        val_df = val_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+        test_df = test_df.drop_duplicates(subset=['OrderStepId', 'QmpId', 'time_idx']). \
+            sort_values('time_idx'). \
+            reset_index(drop=True)
+
+        return train_df, val_df, test_df

@@ -2,9 +2,9 @@ import plotly.express as px
 import os
 from CreateSyntheticDataset.generate_data import generate_parameters, create_data_all
 
-VERSIONS = 30
-NUM_SERIES = 30
-NUM_CORRELATED_LIST = [0, 15, 30]
+VERSIONS = 1
+NUM_SERIES = 10
+NUM_CORRELATED_LIST = [10]
 NUM_SUB_SERIES = 10
 TIMESTEPS_SUB_SERIES = 200
 noise = 0.5
@@ -32,8 +32,8 @@ if __name__ == "__main__":
 
             data.reset_index(drop=True, inplace=True)
 
-            filename = "SyntheticData_Version_{}_Correlated_{}.<suffix>".format(version, num_correlated)
-            data.to_csv(os.path.join(os.getcwd(), filename.replace("<suffix>", "csv")))
-
-            fig = px.line(data, y="Value", x="time_idx", color='Series')
-            fig.write_html(os.path.join(os.getcwd(), filename.replace("<suffix>", "html")))
+            # filename = "SyntheticData_Version_{}_Correlated_{}.<suffix>".format(version+3, num_correlated)
+            # data.to_csv(os.path.join(os.getcwd(), filename.replace("<suffix>", "csv")))
+            #
+            # fig = px.line(data, y="Value", x="time_idx", color='Series')
+            # fig.write_html(os.path.join(os.getcwd(), filename.replace("<suffix>", "html")))

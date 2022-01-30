@@ -38,7 +38,7 @@ COMBINED_FOLDER = "Combined"
 
 ROLLOUT_TASK_TYPE = "rollout"
 
-QUANTILES = [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
+QUANTILES = [0.01, 0.2, 0.5, 0.8, 0.99]
 
 
 def init_base_folders():
@@ -142,7 +142,7 @@ def get_config(dataset_name, model_name):
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
-            "Filename": "SyntheticData_Version_0_Correlated_0.csv",
+            "Filename": "SyntheticData_Version_6_Correlated_10.csv",
             "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_df.pkl'),
             "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_train_df.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER, model_name),
@@ -165,9 +165,9 @@ def get_config(dataset_name, model_name):
             "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'straus_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER, model_name),
             "GroupKeyword": "key",
-            "GroupColumns": ['PartId', 'OrderStepId'],
-            # "ValueKeyword": "ActualValue",
-            "ValueKeyword": "ShellIndex",
+            "GroupColumns": ['PartId', 'OrderStepId', "QmpId"],
+            "ValueKeyword": "ActualValue",
+            # "ValueKeyword": "ShellIndex",
             "ExceptionKeyword": "is_stoppage",
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "EncoderLength": 360,
@@ -196,9 +196,15 @@ def get_config(dataset_name, model_name):
     train_config = {
         "Train": {
             "BatchSize": 32,
-            "TrainRatio": 0.6,
-            "ValRatio": 0.2,
-            "CPU": 0
+            "CPU": 0,
+            "Synthetic": {
+                "TrainRatio": 0.7,
+                "ValRatio": 0.2
+            },
+            "Straus": {
+                "TrainRatio": 0.6,
+                "ValRatio": 0.2
+            }
         }
     }
 
@@ -248,7 +254,7 @@ def get_config(dataset_name, model_name):
             },
         "Env": {
             "ConsecutiveExceptions": 1,
-            "AlertMaxPredictionSteps": 2,
+            "AlertMaxPredictionSteps": 6,
             "RestartSteps": 10,
             "Rewards": {
                 "CheapFP": {
@@ -264,8 +270,8 @@ def get_config(dataset_name, model_name):
             }
         },
         "THTS": {
-            "NumTrials": 500,
-            "TrialLength": 4
+            "NumTrials": 200,
+            "TrialLength": 8
         }
 
     }

@@ -8,6 +8,7 @@ from gym_ad.ad_env import AdEnv
 from utils import get_model_from_checkpoint, load_pickle, create_chunks
 from Algorithms.thts.max_uct import MaxUCT
 import concurrent.futures
+import gc
 
 
 def run_thts_task_for_group(group_name):
@@ -16,7 +17,6 @@ def run_thts_task_for_group(group_name):
 
     config = load_config(path)
     forecasting_model = get_model_from_checkpoint(os.getenv("CHECKPOINT_REG"), os.getenv("MODEL_NAME_REG"))
-
     train_df = load_pickle(os.path.join(path, config.get("TrainDataFramePicklePath")))
     test_df = load_pickle(os.path.join(path, config.get("TestDataFramePicklePath")))
 
@@ -30,6 +30,8 @@ def run_thts_task_for_group(group_name):
     thts = MaxUCT(config, env, predictor, group_name)
     print("Start running THTS task on group name: {}".format(group_name))
     thts.run(test_df)
+    del thts
+    gc.collect()
 
 
 if __name__ == "__main__":

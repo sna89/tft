@@ -48,11 +48,11 @@ def run_time_series_task(config,
 
     if evaluate:
         if task_type == REGRESSION_TASK_TYPE:
-            evaluate_regression(config, test_ts_ds, fitted_model, num_targets)
+            evaluate_regression(config, val_ts_ds, fitted_model, num_targets)
         elif task_type == CLASSIFICATION_TASK_TYPE:
-            evaluate_classification(config, test_ts_ds, fitted_model)
+            evaluate_classification(config, val_ts_ds, fitted_model)
         elif task_type == COMBINED_TASK_TYPE:
-            evaluate_combined(config, test_ts_ds, fitted_model, num_targets)
+            evaluate_combined(config, val_ts_ds, fitted_model, num_targets)
 
     if plot:
         if task_type == REGRESSION_TASK_TYPE:

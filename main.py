@@ -27,6 +27,7 @@ if __name__ == '__main__':
     data = build_data(config, dataset_name)
     data = process_data(config, dataset_name, data)
     # plot_data(config, dataset_name, data)
+    print(config)
 
     train_df, val_df, test_df = split_df(config, dataset_name, data)
     fitted_reg_model = None
@@ -38,7 +39,7 @@ if __name__ == '__main__':
                                                 train_df,
                                                 val_df,
                                                 test_df,
-                                                evaluate=False,
+                                                evaluate=True,
                                                 plot=False)
 
     if os.getenv("CLASS_TASK") == "True":
@@ -63,12 +64,12 @@ if __name__ == '__main__':
         group_names = get_group_names_from_df(config, train_df)
 
         # if False:
-        # PARALLEL_GROUPS = 5
+        # PARALLEL_GROUPS = 2
         # for group_names_chunk in create_chunks(group_names, PARALLEL_GROUPS):
-        #     with concurrent.futures.ProcessPoolExecutor() as executor:
+        #     with concurrent.futures.ProcessPoolExecutor(30) as executor:
         #         executor.map(run_thts_task_for_group, group_names_chunk)
         # else:
-        run_thts_task_for_group(group_names[9])
+        run_thts_task_for_group(group_names[4])
 
     if os.getenv("APPLY_ANOMALY_DETECTION") == "True":
         detector = AnomalyDetection(config, os.getenv("MODEL_NAME_REG"), dataset_name, fitted_reg_model)

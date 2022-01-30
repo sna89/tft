@@ -70,8 +70,8 @@ def plot_reg_predictions(config, model, df, ts_ds, dataset_name, model_name="TFT
 
     else:
         raise ValueError
-    idx_list = list(range(index_df[index_df[config.get("GroupKeyword")] == "9"].index.min(),
-                          index_df[index_df[config.get("GroupKeyword")] == "9"].index.max(),
+    idx_list = list(range(index_df.index.min(),
+                          index_df.index.max(),
                           config.get("PredictionLength")))
 
     for idx in idx_list:

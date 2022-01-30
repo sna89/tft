@@ -1,17 +1,20 @@
 from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
+import os
+from config import get_tree_depth
 from data_utils import reverse_key_value_mapping
 from utils import get_argmax_from_list
 from EnvCommon.env_thts_common import get_reward_from_env, build_next_state, EnvState, \
     get_group_state, get_num_iterations, get_last_val_time_idx, set_env_state, set_env_group, \
-    get_reward_for_alert_from_prediction
+    get_reward_for_alert_from_prediction, clear_env_state_history
 import time
 import pandas as pd
 import numpy as np
 from Algorithms.render import render
-from Algorithms.statistics import init_statistics, update_statistics
+from Algorithms.statistics import init_statistics, update_statistics, output_statistics
 from evaluation import evaluate_classification_from_conf_matrix
 from Algorithms.thts.thts_helper_functions import uct, run_heuristic
+import gc
 
 
 class TrialBasedHeuristicTree:
@@ -47,6 +50,8 @@ class TrialBasedHeuristicTree:
         self.env.env_group_name = self.tree_group_name
 
     def run(self, test_df):
+        start_group = time.time()
+
         state = self.get_initial_state()
         initial_node = DecisionNode(state, parent=None)
         current_node = deepcopy(initial_node)
@@ -66,7 +71,7 @@ class TrialBasedHeuristicTree:
         for iteration in range(1, num_iterations):
             start = time.time()
 
-            action = self._choose_action(current_node)
+            action = self._choose_action(current_node, iteration - 1)
 
             next_state, is_next_state_terminal, is_next_state_restart, reward = self._transition_real_env(
                 current_node,
@@ -89,51 +94,62 @@ class TrialBasedHeuristicTree:
                                            reward,
                                            steps_from_alert_history[-1])
 
-            render(self.config,
-                   self.tree_group_name,
-                   test_df,
-                   action_history,
-                   reward_history,
-                   terminal_history,
-                   restart_history,
-                   steps_from_alert_history,
-                   restart_steps_history)
+            if iteration % 10 == 0 or iteration == num_iterations - 1:
+                render(self.config,
+                       self.tree_group_name,
+                       test_df,
+                       action_history,
+                       reward_history,
+                       terminal_history,
+                       restart_history,
+                       steps_from_alert_history,
+                       restart_steps_history)
 
             current_node = DecisionNode(next_state, parent=current_node, terminal=False)
-
+            clear_env_state_history(current_node.state)
+            gc.collect()
             print()
             print("Group Name: {}, Iteration: {}, Action: {}, Reward: {}".format(self.tree_group_name,
                                                                                  iteration,
                                                                                  action,
-                                                                                 reward))
+                                                                                 reward),
+                  flush=True)
             print()
-            end = time.time()
-            run_time = end - start
-            print("Group Name: {}, RunTime: {}".format(self.tree_group_name, run_time))
+            end_iteration = time.time()
+            run_time_iteration = end_iteration - start
+            print("Group Name: {}, Iteration RunTime: {}".format(self.tree_group_name, run_time_iteration), flush=True)
 
-        print("Group Name: {}, Cumulative Reward: {}".format(self.tree_group_name, sum(reward_history)))
-        print("Group Name: {} Evaluation:")
-        print(["="] * 30)
+        print("Group Name: {} Evaluation:".format(self.tree_group_name))
+        print("=" * 30)
 
-        for group_name, group_statistics in statistics.items():
-            if group_name == self.tree_group_name:
-                tp, fn, fp, tn = list(group_statistics.values())
-                evaluate_classification_from_conf_matrix(tn, fp, fn, tp)
+        cumulative_reward = sum(reward_history)
+        print("Group Name: {}, Cumulative Reward: {}".format(self.tree_group_name, cumulative_reward))
 
-    def select_chance_node_from_decision_node(self, decision_node: DecisionNode):
-        if len(decision_node.successors) == 1:
-            return decision_node.successors[0]
+        end_group = time.time()
+        run_time_group = end_group - start_group
+        print("Group Name: {}, RunTime: {}".format(self.tree_group_name, run_time_group))
+
+        output_statistics(statistics, cumulative_reward, self.tree_group_name)
+
+    def select_chance_node_from_decision_node(self, decision_node: DecisionNode, node_depth: int):
+        tree_depth = get_tree_depth(self.config)
+        current_depth = tree_depth - node_depth
 
         if all([chance_node.visits == 0 for chance_node in decision_node.successors]):
-            list(map(lambda chance_node: run_heuristic(self.config,
-                                                       chance_node,
-                                                       decision_node.prediction,
-                                                       self.tree_group_name),
+            list(map(lambda chance_node: run_heuristic(config=self.config,
+                                                       chance_node=chance_node,
+                                                       steps=current_depth,
+                                                       prediction=decision_node.prediction,
+                                                       group_name=self.tree_group_name),
                      decision_node.successors))
             max_idx = get_argmax_from_list([chance_node.value for chance_node in decision_node.successors])
         else:
-            successor_nodes_uct_values = [uct(chance_node) for chance_node in decision_node.successors]
-            max_idx = get_argmax_from_list(successor_nodes_uct_values, choose_random=True)
+            if all(chance_node.visits > 0 for chance_node in decision_node.successors) and \
+                    os.getenv("MODEL_NAME_REG") == "TFT":
+                max_idx = 0
+            else:
+                successor_nodes_uct_values = [uct(chance_node) for chance_node in decision_node.successors]
+                max_idx = get_argmax_from_list(successor_nodes_uct_values, choose_random=True)
 
         return decision_node.successors[max_idx]
 
@@ -148,14 +164,14 @@ class TrialBasedHeuristicTree:
         initial_state = self.env.current_state
         return initial_state
 
-    def _choose_action(self, current_node: DecisionNode):
+    def _choose_action(self, current_node: DecisionNode, iteration: int):
         action = 0
         if self.is_alertable_state(current_node,
                                    self.env.env_steps_from_alert,
                                    self.env.env_restart_steps,
                                    self.tree_group_name):
             for _ in range(self.num_trials):
-                self._run_trial(current_node)
+                self._run_trial(current_node, iteration)
             action = self.select_max_value_action(current_node)
         return action
 
@@ -171,37 +187,36 @@ class TrialBasedHeuristicTree:
             return True
         return False
 
-    def _run_trial(self, root_node: DecisionNode):
+    def _run_trial(self, root_node: DecisionNode, iteration: int):
         set_env_state(self.env, root_node.state)
-        self._visit_decision_node(root_node, depth=0, terminal=False)
+        self._visit_decision_node(root_node, depth=0, terminal=False, iteration=iteration)
 
-    def _visit_decision_node(self, decision_node: DecisionNode, depth: int, terminal: bool = False):
+    def _visit_decision_node(self, decision_node: DecisionNode, depth: int, terminal: bool = False, iteration: int = 0):
         decision_node.visit()
         if not terminal:
             if decision_node.is_first_visit():
                 self._expand_decision_node(decision_node)  # expansion
-                prediction = self._run_prediction(decision_node)
+                prediction = self._run_prediction(decision_node, iteration)
                 decision_node.prediction = prediction
             else:
                 prediction = decision_node.prediction
 
-            chance_node = self.select_chance_node_from_decision_node(decision_node)  # select action
-            self._visit_chance_node(chance_node, prediction, depth)
+            chance_node = self.select_chance_node_from_decision_node(decision_node, depth)  # select action
+            self._visit_chance_node(chance_node, prediction, depth, iteration)
 
         self._backup_decision_node(decision_node)
 
-    def _visit_chance_node(self, chance_node: ChanceNode, prediction, depth: int):
+    def _visit_chance_node(self, chance_node: ChanceNode, prediction, depth: int, iteration: int):
         terminal = False
         if self.consider_trial_length and depth == self.trial_length - 1:
             terminal = True
 
+        chance_node.visit()
         if chance_node.action == 0:
-            chance_node.visit()
-
             chosen_quantile = self._draw_decision_node_quantile()
             decision_node = chance_node.get_successor(chosen_quantile)
 
-            if chance_node.is_first_visit() or not decision_node:
+            if not decision_node:
                 sampled_prediction = self.predictor.sample_from_prediction(prediction, self.tree_group_id,
                                                                            chosen_quantile)
                 next_state, reward = self._create_next_state(chance_node, sampled_prediction)
@@ -210,9 +225,7 @@ class TrialBasedHeuristicTree:
                                                        chance_node,
                                                        chosen_quantile=chosen_quantile,
                                                        terminal=terminal)
-            else:
-                decision_node.terminal = terminal
-            self._visit_decision_node(decision_node, depth + 1, terminal)
+            self._visit_decision_node(decision_node, depth + 1, terminal, iteration)
 
         elif chance_node.action == 1:
             reward = get_reward_for_alert_from_prediction(self.config,
@@ -333,6 +346,6 @@ class TrialBasedHeuristicTree:
             return False
         return True
 
-    def _run_prediction(self, decision_node: DecisionNode):
-        prediction = self.predictor.predict(decision_node.state)
+    def _run_prediction(self, decision_node: DecisionNode, iteration):
+        prediction = self.predictor.predict(decision_node.state, iteration)
         return prediction

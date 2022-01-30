@@ -88,7 +88,8 @@ def assign_time_idx(df, dt_col):
     return df
 
 
-def get_group_lower_and_upper_bounds(config, group_name, is_observed=True):
+def get_group_lower_and_upper_bounds(config, group_name):
+    is_observed = os.getenv("IS_EXCEPTION_OBSERVED") == "True"
     if is_observed:
         bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(OBSERVED_KEYWORD)
     else:
@@ -98,23 +99,21 @@ def get_group_lower_and_upper_bounds(config, group_name, is_observed=True):
 
 
 def create_bounds_labels(config, data):
-    observed_bound_col = config.get("ObservedBoundKeyword")
-    unobserved_bound_col = config.get("UnobservedBoundKeyword")
+    is_observed = os.getenv("IS_EXCEPTION_OBSERVED") == "True"
+    bound_col = config.get("ObservedBoundKeyword") if is_observed else config.get("UnobservedBoundKeyword")
 
-    data = add_observed_bound_column(observed_bound_col, data)
-    data = add_unobserved_bound_column(unobserved_bound_col, data)
+    if is_observed:
+        data = add_observed_bound_column(bound_col, data)
+    else:
+        data = add_unobserved_bound_column(bound_col, data)
 
     groups = pd.unique(data[config.get("GroupKeyword")])
     for group in groups:
         group_data = data[data[config.get("GroupKeyword")] == group]
         horizon = config.get("PredictionLength")
+        data.loc[group_data.index, bound_col] = add_bounds_label(config, group_data, group, horizon)
 
-        data.loc[group_data.index, observed_bound_col] = add_bounds_label(config, group_data, group, horizon, is_observed=True)
-        data.loc[group_data.index, unobserved_bound_col] = add_bounds_label(config, group_data, group, horizon, is_observed=False)
-
-    data[observed_bound_col] = data[observed_bound_col].astype(int).astype(str).astype("category")
-    data[unobserved_bound_col] = data[unobserved_bound_col].astype(int).astype(str).astype("category")
-
+    data[bound_col] = data[bound_col].astype(int).astype(str).astype("category")
     return data
 
 
@@ -128,11 +127,8 @@ def add_unobserved_bound_column(unobserved_bound_col, data):
     return data
 
 
-def add_bounds_label(config, data, group, horizon, is_observed=True):
-    if is_observed:
-        lb, ub = get_group_lower_and_upper_bounds(config, group, is_observed=True)
-    else:
-        lb, ub = get_group_lower_and_upper_bounds(config, group, is_observed=False)
+def add_bounds_label(config, data, group, horizon):
+    lb, ub = get_group_lower_and_upper_bounds(config, group)
     shifted_values = data.shift(-horizon)[config.get("ValueKeyword")]
     data["Exception"] = (shifted_values < lb) | (shifted_values > ub)
     data["ConsecutiveExceptions"] = data["Exception"].rolling(min_periods=1,

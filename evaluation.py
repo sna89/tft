@@ -56,8 +56,9 @@ def evaluate_regression_groups(config, ts_ds, actual, predictions):
 
 def evaluate_regression_group(actual, predictions, group_name, group_indices):
     group_mse = mean_squared_error(actual[group_indices], predictions[group_indices])
+    group_rmse = mean_squared_error(actual[group_indices], predictions[group_indices], squared=False)
     group_mae = mean_absolute_error(actual[group_indices], predictions[group_indices])
-    print("Group: {}, MAE: {}, MSE: {}".format(group_name, group_mae, group_mse))
+    print("Group: {}, MAE: {}, MSE: {}, RMSE: {}".format(group_name, group_mae, group_mse, group_rmse))
 
 
 def evaluate_classification(config, ts_ds, model, num_targets):
@@ -90,6 +91,8 @@ def evaluate_classification_from_conf_matrix(tn, fp, fn, tp):
 
     f_score = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
     print("F-Score: {}".format(f_score))
+
+    return precision, recall, f_score
 
 
 def evaluate_base_model(dl):

@@ -5,13 +5,14 @@ from config import REGRESSION_TASK_TYPE, \
     CLASSIFICATION_TASK_TYPE,\
     COMBINED_TASK_TYPE, \
     ROLLOUT_TASK_TYPE
+import os
 
 
 class DataBuilder(ABC):
     def __init__(self, config):
         self.config = config
-        self.train_ratio = config.get("Train").get("TrainRatio")
-        self.val_ratio = config.get("Train").get("ValRatio")
+        self.train_ratio = config.get("Train").get(os.getenv("DATASET")).get("TrainRatio")
+        self.val_ratio = config.get("Train").get(os.getenv("DATASET")).get("ValRatio")
         self.enc_length = config.get("EncoderLength")
         self.prediction_length = config.get("PredictionLength")
 
