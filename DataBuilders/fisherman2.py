@@ -1,7 +1,7 @@
 from datetime import timedelta
 import os
 import pandas as pd
-from data_utils import add_dt_columns, assign_time_idx, create_bounds_labels
+from Utils.data_utils import add_dt_columns, assign_time_idx
 from pytorch_forecasting import TimeSeriesDataSet, NaNLabelEncoder
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN, KEY_DELIMITER

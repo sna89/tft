@@ -5,7 +5,7 @@ from EnvCommon.env_thts_common import get_group_names_from_df
 from EnvCommon.predictor import Predictor
 from config import load_config
 from gym_ad.ad_env import AdEnv
-from utils import get_model_from_checkpoint, load_pickle, create_chunks
+from Utils.utils import get_model_from_checkpoint, load_pickle, create_chunks
 from Algorithms.thts.max_uct import MaxUCT
 import concurrent.futures
 import gc

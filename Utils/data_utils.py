@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from config import DATETIME_COLUMN, OBSERVED_KEYWORD, NOT_OBSERVED_KEYWORD
+from config import DATETIME_COLUMN, OBSERVED_KEYWORD, NOT_OBSERVED_KEYWORD, OBSERVED_LB_KEYWORD, OBSERVED_UB_KEYWORD, \
+    NOT_OBSERVED_LB_KEYWORD, NOT_OBSERVED_UB_KEYWORD
 from typing import List, Union, Dict
 import os
 import torch
@@ -91,11 +92,47 @@ def assign_time_idx(df, dt_col):
 def get_group_lower_and_upper_bounds(config, group_name):
     is_observed = os.getenv("IS_EXCEPTION_OBSERVED") == "True"
     if is_observed:
-        bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(OBSERVED_KEYWORD)
+        try:
+            bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(OBSERVED_KEYWORD)
+        except AttributeError as e:
+            bounds = None
     else:
-        bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(NOT_OBSERVED_KEYWORD)
+        try:
+            bounds = config.get("AnomalyConfig").get(os.getenv("DATASET")).get(group_name).get(NOT_OBSERVED_KEYWORD)
+        except AttributeError as e:
+            bounds = None
+
+    if not bounds:
+        return [None, None]
+
     lb, ub = bounds.values()
     return lb, ub
+
+
+def add_bounds_to_config(config, group, group_bounds, is_observed=True):
+    if is_observed:
+        add_observed_bounds_to_config(config, group, group_bounds)
+    else:
+        add_not_observed_bounds_to_config(config, group, group_bounds)
+
+
+def add_observed_bounds_to_config(config, group, group_bounds):
+    observed_lb, observed_ub = group_bounds[0], group_bounds[1]
+    config['AnomalyConfig'][os.getenv("DATASET")][group][OBSERVED_KEYWORD] = {OBSERVED_LB_KEYWORD: observed_lb,
+                                                                              OBSERVED_UB_KEYWORD: observed_ub}
+
+
+def add_not_observed_bounds_to_config(config, group, group_bounds):
+    delta = calc_bound_delta(group_bounds)
+    not_observed_lb, not_observed_ub = group_bounds[0] - delta, group_bounds[1] + delta
+
+    config['AnomalyConfig'][os.getenv("DATASET")][group][NOT_OBSERVED_KEYWORD] = {
+        NOT_OBSERVED_LB_KEYWORD: not_observed_lb,
+        NOT_OBSERVED_UB_KEYWORD: not_observed_ub}
+
+
+def calc_bound_delta(group_bounds):
+    return abs(group_bounds[0] - group_bounds[1]) * 0.1
 
 
 def create_bounds_labels(config, data):
@@ -110,7 +147,7 @@ def create_bounds_labels(config, data):
     groups = pd.unique(data[config.get("GroupKeyword")])
     for group in groups:
         group_data = data[data[config.get("GroupKeyword")] == group]
-        horizon = config.get("PredictionLength")
+        horizon = config.get("Env").get("AlertMaxPredictionSteps")
         data.loc[group_data.index, bound_col] = add_bounds_label(config, group_data, group, horizon)
 
     data[bound_col] = data[bound_col].astype(int).astype(str).astype("category")
@@ -132,7 +169,8 @@ def add_bounds_label(config, data, group, horizon):
     shifted_values = data.shift(-horizon)[config.get("ValueKeyword")]
     data["Exception"] = (shifted_values < lb) | (shifted_values > ub)
     data["ConsecutiveExceptions"] = data["Exception"].rolling(min_periods=1,
-                                                              window=config.get("Env").get("ConsecutiveExceptions")).sum()
+                                                              window=config.get("Env").get(
+                                                                  "ConsecutiveExceptions")).sum()
     return data["ConsecutiveExceptions"] == config.get("Env").get("ConsecutiveExceptions")
 
 
@@ -156,7 +194,3 @@ def is_group_prediction_out_of_bound(group_prediction, lb, ub):
         return True, idx
     else:
         return False, -1
-
-
-
-

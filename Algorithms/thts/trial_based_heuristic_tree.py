@@ -1,9 +1,9 @@
 from Algorithms.thts.node import DecisionNode, ChanceNode
 from copy import deepcopy
 import os
-from config import get_tree_depth
-from data_utils import reverse_key_value_mapping
-from utils import get_argmax_from_list
+from config import get_tree_depth, THTS_TASK_TYPE
+from Utils.data_utils import reverse_key_value_mapping
+from Utils.utils import get_argmax_from_list
 from EnvCommon.env_thts_common import get_reward_from_env, build_next_state, EnvState, \
     get_group_state, get_num_iterations, get_last_val_time_idx, set_env_state, set_env_group, \
     get_reward_for_alert_from_prediction, clear_env_state_history
@@ -12,7 +12,6 @@ import pandas as pd
 import numpy as np
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics, output_statistics
-from evaluation import evaluate_classification_from_conf_matrix
 from Algorithms.thts.thts_helper_functions import uct, run_heuristic
 import gc
 
@@ -129,7 +128,7 @@ class TrialBasedHeuristicTree:
         run_time_group = end_group - start_group
         print("Group Name: {}, RunTime: {}".format(self.tree_group_name, run_time_group))
 
-        output_statistics(statistics, cumulative_reward, self.tree_group_name)
+        output_statistics(statistics, cumulative_reward, self.tree_group_name, THTS_TASK_TYPE)
 
     def select_chance_node_from_decision_node(self, decision_node: DecisionNode, node_depth: int):
         tree_depth = get_tree_depth(self.config)

@@ -3,11 +3,10 @@ from datetime import timedelta
 import numpy as np
 import os
 import pandas as pd
-from data_utils import add_dt_columns, assign_time_idx
-from pytorch_forecasting import TimeSeriesDataSet, MultiNormalizer
+from Utils.data_utils import add_dt_columns, assign_time_idx, add_bounds_to_config
+from pytorch_forecasting import TimeSeriesDataSet
 from DataBuilders.data_builder import DataBuilder
 from config import DATETIME_COLUMN, KEY_DELIMITER
-from utils import save_to_pickle
 from pytorch_forecasting.data import NaNLabelEncoder
 
 KEY_COLUMN = 'key'
@@ -15,10 +14,10 @@ BOUNDS_PARAMETER_NAME_LIST = ['MinValue', 'MinWarnValue', 'MaxWarnValue', 'MaxVa
 PLANT_MODEL_ID = 2629
 # MAX_ORDER_STEP_ID = 430000
 MIN_DATETIME = datetime.datetime(day=1, month=4, year=2021)
-MAX_DATETIME = datetime.datetime(day=1, month=7, year=2021)
-QMP_FILTER_LIST = [6, 9, 11, 14, 19, 26, 53]
+MAX_DATETIME = datetime.datetime(day=1, month=9, year=2021)
+QMP_FILTER_LIST = [4, 6, 9, 11, 14, 18, 19, 26, 53]
 QMP_ID_NIGHT_MODE = 19
-NIGHT_MODE_THRESHOLD_VALUE = 40
+NIGHT_MODE_THRESHOLD_VALUE = 35
 UNPLANNED_STOPPAGE_TYPE_ID = 4
 MIN_STOPPAGE_DURATION = timedelta(minutes=15)
 
@@ -50,6 +49,9 @@ class StrausDataBuilder(DataBuilder):
         data.reset_index(drop=True, inplace=True)
         # save_to_pickle(data, self.config.get("ProcessedDataPath"))
         return data
+
+    def fill_missing_data(self, data):
+        pass
 
     def read_files(self):
         filenames = os.listdir(self.config.get("Path"))
@@ -235,16 +237,18 @@ class StrausDataBuilder(DataBuilder):
         return qmp_order_log_df
 
     def filter_night_mode(self, qmp_log_df):
-        filter_df = qmp_log_df[qmp_log_df["QmpId"] == QMP_ID_NIGHT_MODE]
+        filter_df = qmp_log_df[qmp_log_df["QmpId"] == QMP_ID_NIGHT_MODE].sort_values(by=DATETIME_COLUMN)
         filter_df = filter_df[filter_df[self.config.get("ValueKeyword")] > NIGHT_MODE_THRESHOLD_VALUE]
         filter_df['TimeDiff'] = filter_df[DATETIME_COLUMN] - filter_df[DATETIME_COLUMN].shift(1)
         filter_df['TimeDiff'] = filter_df['TimeDiff'].fillna(timedelta(hours=2))
         dt_to_filter_list = pd.to_datetime(filter_df[filter_df['TimeDiff'] >= timedelta(hours=1)][DATETIME_COLUMN])
+        index_to_filter = pd.Index([])
         for dt_to_filter in dt_to_filter_list:
-            start_dt = dt_to_filter + timedelta(hours=-1)
-            end_dt = dt_to_filter + timedelta(hours=1)
-            mask_index = qmp_log_df[(qmp_log_df[DATETIME_COLUMN] < start_dt) | (qmp_log_df[DATETIME_COLUMN] > end_dt)].index
-            qmp_log_df = qmp_log_df.loc[mask_index]
+            start_dt = dt_to_filter - timedelta(hours=2, minutes=0)
+            end_dt = dt_to_filter + timedelta(hours=2, minutes=0)
+            c_index_to_filter = qmp_log_df[(qmp_log_df[DATETIME_COLUMN] >= start_dt) & (qmp_log_df[DATETIME_COLUMN] <= end_dt)].index
+            index_to_filter = index_to_filter.union(c_index_to_filter)
+        qmp_log_df = qmp_log_df.drop(index=index_to_filter)
         return qmp_log_df
 
     @staticmethod
@@ -324,6 +328,16 @@ class StrausDataBuilder(DataBuilder):
         data[KEY_COLUMN] = data['PartId'].astype(str) + KEY_DELIMITER + \
                            data['OrderStepId'].astype(int).astype(str) + KEY_DELIMITER + \
                            data['QmpId'].astype(int).astype(str)
+
+    def update_bounds(self, train_df, val_df, test_df):
+        self.config['AnomalyConfig'][os.getenv("DATASET")] = {}
+        groups = pd.unique(test_df[self.config.get("GroupKeyword")])
+        for group in groups:
+            self.config['AnomalyConfig'][os.getenv("DATASET")][group] = {}
+            lower_bound = pd.unique(test_df[test_df[self.config.get("GroupKeyword")] == group]["MinValue"])[0]
+            upper_bound = pd.unique(test_df[test_df[self.config.get("GroupKeyword")] == group]["MaxValue"])[0]
+            group_bounds = [lower_bound, upper_bound]
+            add_bounds_to_config(self.config, group, group_bounds, is_observed=True)
 
     def _get_bounds(self, filename, data):
         if 'CI_QmpLog_data' in filename:

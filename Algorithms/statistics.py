@@ -1,8 +1,9 @@
+import os
 from EnvCommon.env_thts_common import get_env_steps_from_alert
-from config import get_false_alert_reward, get_missed_alert_reward
+from config import get_false_alert_reward, get_missed_alert_reward, get_task_folder_name
 from torch import Tensor
 import pandas as pd
-
+from config import REGRESSION_TASK_TYPE, RESULT
 from evaluation import evaluate_classification_from_conf_matrix
 
 
@@ -54,9 +55,9 @@ def update_statistics(config,
     return statistics
 
 
-def output_statistics(statistics, reward, filter_group_name=None):
+def output_statistics(statistics, reward, filter_group_name=None, task_type=REGRESSION_TASK_TYPE):
     for group_name, group_statistics in statistics.items():
-        if filter_group_name is None or group_name == filter_group_name:
+        if not filter_group_name or group_name == filter_group_name:
             evaluation_dict = dict()
             if isinstance(reward, int):
                 evaluation_dict["Cumulative Reward"] = [reward]
@@ -74,4 +75,12 @@ def output_statistics(statistics, reward, filter_group_name=None):
             evaluation_dict["Recall"] = [recall]
             evaluation_dict["F_score"] = [f_score]
             evaluation_df = pd.DataFrame.from_dict(evaluation_dict)
-            evaluation_df.to_csv("evaluation_{}.csv".format(group_name))
+
+            folder_name = get_task_folder_name(task_type)
+
+            evaluation_df.to_csv(os.path.join(RESULT,
+                                              folder_name,
+                                              "evaluation_{}.csv".format(group_name)))
+
+
+

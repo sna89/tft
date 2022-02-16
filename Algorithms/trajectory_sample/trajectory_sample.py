@@ -6,7 +6,7 @@ import numpy as np
 import time
 from Algorithms.render import render
 from Algorithms.statistics import init_statistics, update_statistics
-from data_utils import get_group_lower_and_upper_bounds, get_group_id_group_name_mapping, is_group_prediction_out_of_bound
+from Utils.data_utils import get_group_lower_and_upper_bounds, get_group_id_group_name_mapping, is_group_prediction_out_of_bound
 
 
 class TrajectorySample:

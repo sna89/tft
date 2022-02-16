@@ -1,11 +1,9 @@
 import pandas as pd
-from pytorch_forecasting import TimeSeriesDataSet, MultiNormalizer, NaNLabelEncoder
-from data_utils import create_bounds_labels
+from pytorch_forecasting import TimeSeriesDataSet
+from Utils.data_utils import add_bounds_to_config
 from DataBuilders.data_builder import DataBuilder
 import numpy as np
 import os
-from config import OBSERVED_KEYWORD, OBSERVED_LB_KEYWORD, OBSERVED_UB_KEYWORD, \
-    NOT_OBSERVED_KEYWORD, NOT_OBSERVED_LB_KEYWORD, NOT_OBSERVED_UB_KEYWORD, update_config
 
 
 class SyntheticDataBuilder(DataBuilder):
@@ -22,49 +20,20 @@ class SyntheticDataBuilder(DataBuilder):
 
     def preprocess(self, data):
         data[self.config.get("GroupKeyword")] = data[self.config.get("GroupKeyword")].astype(str).astype("category")
-        self._update_bounds(data)
-        update_config(self.config)
-        data = create_bounds_labels(self.config, data)
         return data
 
-    def _update_bounds(self, data):
+    def update_bounds(self, train_df, val_df, test_df):
         self.config['AnomalyConfig'][os.getenv("DATASET")] = {}
+        data = pd.concat([train_df, val_df], axis=0)
         groups = pd.unique(data[self.config.get("GroupKeyword")])
-        train_val_ratio = self.config.get("Train").get(os.getenv("DATASET")).get("TrainRatio") + \
-                          self.config.get("Train").get(os.getenv("DATASET")).get("ValRatio")
-        max_val_time_idx = int(data['time_idx'].max() * train_val_ratio)
         for group in groups:
             group_quantiles = np.quantile(
-                data[(data[self.config.get("GroupKeyword")] == group) &
-                     (data["time_idx"] < max_val_time_idx)][self.config.get("ValueKeyword")],
+                data[data[self.config.get("GroupKeyword")] == group][self.config.get("ValueKeyword")],
                 q=[0, 0.025, 0.975, 1])
 
             self.config['AnomalyConfig'][os.getenv("DATASET")][group] = {}
-            self._add_bounds_to_config(group, group_quantiles, is_observed=True)
-            self._add_bounds_to_config(group, group_quantiles, is_observed=False)
-
-    def _add_bounds_to_config(self, group, group_quantiles, is_observed=True):
-        if is_observed:
-            self._add_observed_bounds_to_config(group, group_quantiles)
-        else:
-            self._add_not_observed_bounds_to_config(group, group_quantiles)
-
-    def _add_observed_bounds_to_config(self, group, group_quantiles):
-        observed_lb, observed_ub = group_quantiles[1], group_quantiles[2]
-        self.config['AnomalyConfig'][os.getenv("DATASET")][group][OBSERVED_KEYWORD] = {OBSERVED_LB_KEYWORD: observed_lb,
-                                                                                       OBSERVED_UB_KEYWORD: observed_ub}
-
-    def _add_not_observed_bounds_to_config(self, group, group_quantiles):
-        delta = self._calc_bound_delta(group_quantiles)
-        not_observed_lb, not_observed_ub = group_quantiles[0] - delta, group_quantiles[-1] + delta
-
-        self.config['AnomalyConfig'][os.getenv("DATASET")][group][NOT_OBSERVED_KEYWORD] = {
-            NOT_OBSERVED_LB_KEYWORD: not_observed_lb,
-            NOT_OBSERVED_UB_KEYWORD: not_observed_ub}
-
-    @staticmethod
-    def _calc_bound_delta(group_quantiles):
-        return abs(group_quantiles[0] - group_quantiles[-1]) * 0.1
+            add_bounds_to_config(self.config, group, group_quantiles[1: 3], is_observed=True)
+            add_bounds_to_config(self.config, group, group_quantiles[[0, -1]], is_observed=False)
 
     def define_regression_ts_ds(self, train_df):
         ts_ds = TimeSeriesDataSet(

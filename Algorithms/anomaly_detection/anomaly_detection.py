@@ -1,16 +1,15 @@
 import pandas as pd
 import numpy as np
-from config import DATETIME_COLUMN, PLOT
+from config import DATETIME_COLUMN
 from DataBuilders.build import convert_df_to_ts_data
-from data_utils import get_dataloader
-from utils import flatten_nested_list
+from Utils.data_utils import get_dataloader, get_group_id_group_name_mapping
+from Utils.utils import flatten_nested_list
 from plot import plot_single_prediction
 import torch
 from evaluation import get_classification_evaluation_summary
 from DataBuilders.msl import LABELED_ANOMALIES_FILE
 import os
 from DataBuilders.msl import MSLDataBuilder
-import itertools
 
 
 class AnomalyDetection:
@@ -22,34 +21,37 @@ class AnomalyDetection:
 
     def detect_and_evaluate(self, train_df, test_df, plot=False):
         train_ts_ds, parameters = convert_df_to_ts_data(self.config, self.dataset_name, train_df, None, "reg")
-        ts_ds, _ = convert_df_to_ts_data(self.config, self.dataset_name, test_df, parameters, "reg")
+        test_ts_ds, _ = convert_df_to_ts_data(self.config, self.dataset_name, test_df, parameters, "reg")
 
-        anomaly_actual_dict = self._build_anomaly_actual_dict()
-        anomaly_prediction_dict = dict()
+        # anomaly_actual_dict = self._build_anomaly_actual_dict()
+        # anomaly_prediction_dict = dict()
         anomaly_dict = dict()
         anomaly_idx = 0
 
-        dl = get_dataloader(ts_ds, False, self.config)
+        test_dl = get_dataloader(test_ts_ds, False, self.config)
 
-        predictions, x = self.forecast_model.predict(dl, return_x=True, mode='raw', show_progress_bar=True)
-        x_index_df = dl.dataset.x_to_index(x)
+        predictions, x = self.forecast_model.predict(test_dl, return_x=True, mode='raw', show_progress_bar=True)
+        x_index_df = test_dl.dataset.x_to_index(x)
 
         # if self.model_name == "TFT":
         interpretation = self.forecast_model.interpret_output(predictions, attention_prediction_horizon=0)
         predictions = predictions['prediction']
 
-        groups = x['groups'].unique()
-        for group in groups:
-            mask = x['groups'] == group
-            group_indices = torch.nonzero(mask)[:, 0]
-            group_name = self._get_group_name(x_index_df, group_indices[0])
+        # groups = x['groups'].unique()
+        group_id_group_name_mapping = get_group_id_group_name_mapping(self.config, test_ts_ds)
+        group_names = list(group_id_group_name_mapping.values())
+        for i, group_id_tensor in enumerate(x['groups'].unique()):
+            # mask = x['groups'] == group
+            group_id = group_id_tensor.item()
+            group_name = group_names[i]
+            group_indices = torch.nonzero(x['groups'] == group_id).T[0]
 
-            anomaly_prediction_dict[group_name] = [0] * self.config.get("EncoderLength")
+            # anomaly_prediction_dict[group_name] = [0] * self.config.get("EncoderLength")
             indices_to_ignore = []
 
             for idx in group_indices:
                 if idx in indices_to_ignore:
-                    anomaly_prediction_dict[group_name].append(1)
+                    # anomaly_prediction_dict[group_name].append(1)
                     continue
 
                 prediction = predictions[idx]
@@ -59,7 +61,7 @@ class AnomalyDetection:
                     indices_to_ignore.extend(
                         self._get_prediction_indices(group_indices, idx.item(), self.config.get("PredictionLength") - 1)
                     )
-                    anomaly_prediction_dict[group_name].append(1)
+                    # anomaly_prediction_dict[group_name].append(1)
                     current_time_idx = self.get_current_time_idx(test_df, group_name, idx, x)
 
                     current_dt = None
@@ -85,14 +87,16 @@ class AnomalyDetection:
                                                self.dataset_name,
                                                interpretation)
                 else:
-                    anomaly_prediction_dict[group_name].append(0)
+                    pass
+                    # anomaly_prediction_dict[group_name].append(0)
 
-            last_prediction_anomaly = anomaly_prediction_dict[group_name][-1]
-            anomaly_prediction_dict[group_name].extend(
-                [last_prediction_anomaly] * (self.config.get("PredictionLength") - 1))
+            # last_prediction_anomaly = anomaly_prediction_dict[group_name][-1]
+            # anomaly_prediction_dict[group_name].extend(
+            #     [last_prediction_anomaly] * (self.config.get("PredictionLength") - 1))
 
         anomaly_df = pd.DataFrame.from_dict(anomaly_dict, orient="index")
-        self._evaluate(anomaly_actual_dict, anomaly_prediction_dict)
+        # self._evaluate(anomaly_actual_dict, anomaly_prediction_dict)
+        anomaly_df.to_csv("anomalies.csv")
         return anomaly_df
 
     def get_current_time_idx(self, df, group_name, idx, x):
@@ -119,7 +123,7 @@ class AnomalyDetection:
             # if actual_value < second_lower_bound or actual_value > second_higher_bound:
             #     second_outer_quantile_excpeptions.append(idx)
 
-        if len(first_outer_quantile_exceptions) > self.config.get("PredictionLength") // 2:
+        if len(first_outer_quantile_exceptions) > 3:
             #     or \
             # (len(first_outer_quantile_exceptions) >= 2 and len(second_outer_quantile_excpeptions) >= 1) or \
             #     (len(first_outer_quantile_exceptions) >= 1 and len(second_outer_quantile_excpeptions) >= 2):

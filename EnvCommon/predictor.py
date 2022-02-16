@@ -1,15 +1,12 @@
 import datetime
-
 import torch
-
 from EnvCommon.env_thts_common import get_last_val_time_idx, get_last_val_date, get_num_series
-from config import DATETIME_COLUMN, REGRESSION_TASK_TYPE
-from data_utils import get_group_id_group_name_mapping, add_dt_columns, get_dataloader, reverse_key_value_mapping
+from config import DATETIME_COLUMN
+from Utils.data_utils import get_group_id_group_name_mapping, add_dt_columns, reverse_key_value_mapping
 from config import get_num_quantiles
-from utils import get_prediction_mode
+from Utils.utils import get_prediction_mode
 import numpy as np
 import pandas as pd
-import time
 
 
 class Predictor:
@@ -32,11 +29,7 @@ class Predictor:
         self.num_series = get_num_series(self.config, self.test_df)
 
     def predict(self, current_state, iteration=0):
-        # start = time.time()
         prediction_df = self._build_prediction_df(current_state, iteration)
-        # end = time.time()
-        # run_time = end - start
-        # print(run_time)
         prediction_mode = get_prediction_mode()
         model_prediction, x = self.forecasting_model.predict(prediction_df, mode=prediction_mode, return_x=True)
 

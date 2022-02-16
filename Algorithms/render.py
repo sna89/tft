@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 import pandas as pd
 from typing import List, Dict
 import os
-from config import PLOT
+from config import get_task_folder_name, REGRESSION_TASK_TYPE, PLOT
 from EnvCommon.env_thts_common import get_last_val_time_idx
 
 
@@ -68,7 +68,8 @@ def render(config,
            terminal_history: List[bool],
            restart_history: List[bool],
            alert_prediction_steps_history: List[int],
-           restart_steps_history: List[int]):
+           restart_steps_history: List[int],
+           task_type=REGRESSION_TASK_TYPE):
 
     min_test_time_idx = get_last_val_time_idx(config, test_df)
     time_idx_list = list(test_df[test_df.time_idx >= min_test_time_idx]['time_idx'].unique())
@@ -99,4 +100,9 @@ def render(config,
 
     fig.update_xaxes(title_text="<b>time_idx</b>")
     fig.update_yaxes(title_text="<b>Actual</b>")
-    fig.write_html(os.path.join(PLOT, os.getenv("DATASET"), 'render_synthetic_{}.html'.format(env_group_name)))
+
+    folder_name = get_task_folder_name(task_type)
+    fig.write_html(os.path.join(PLOT,
+                                os.getenv("DATASET"),
+                                folder_name,
+                                'render_synthetic_{}.html'.format(env_group_name)))

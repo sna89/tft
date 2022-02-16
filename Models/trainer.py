@@ -7,9 +7,9 @@ from Models.study import get_study_path, get_study_pkl_path
 from Models.tft import create_tft_model, optimize_tft_hp
 from Models.deep_ar import create_deepar_model, optimize_deepar_hp
 from Models.fc_utils import create_mlp_model
-from data_utils import get_dataloader
-from utils import load_pickle, get_model_from_checkpoint, get_model_from_trainer
-from config import REGRESSION_TASK_TYPE, COMBINED_TASK_TYPE, CLASSIFICATION_TASK_TYPE
+from Utils.data_utils import get_dataloader
+from Utils.utils import load_pickle, get_model_from_checkpoint, get_model_from_trainer
+from config import CLASSIFICATION_TASK_TYPE
 
 
 def optimize_hp(config, train_ds, val_ds, model_name, task_type, loss=None):
@@ -54,7 +54,7 @@ def fit_model(config, task_type, train_ds, val_ds, model_name, loss, output_size
         trainer = create_trainer(study,
                                  gradient_clip_val=0.1,
                                  model_name=trainer_model_name)
-        model = create_model(config, model_name, train_ds, loss, output_size, study)
+        model = create_model(model_name, train_ds, loss, output_size, study)
         trainer = fit(trainer, model, train_dl, val_dl)
 
         model = get_model_from_trainer(trainer, model_name)
@@ -96,13 +96,13 @@ def fit(trainer, model, train_dl, val_dl):
     return trainer
 
 
-def create_model(config, model_name, train_ds, loss, output_size, study=None):
+def create_model(model_name, train_ds, loss, output_size, study=None):
     if model_name == "TFT":
         model = create_tft_model(train_ds, loss, output_size, study)
     elif model_name == "DeepAR":
         model = create_deepar_model(train_ds, None)
     elif model_name == "Mlp":
-        model = create_mlp_model(config, loss)
+        model = create_mlp_model(loss)
     else:
         raise ValueError
     return model

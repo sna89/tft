@@ -1,7 +1,7 @@
 from EnvCommon.env_thts_common import get_reward_from_env, build_next_state, EnvState, get_last_val_time_idx, \
     get_env_steps_from_alert, get_env_restart_steps, \
-    get_group_names_from_df, get_num_series, build_state_from_df_time_idx
-from data_utils import get_group_id_group_name_mapping
+    build_state_from_df_time_idx
+from Utils.data_utils import get_group_id_group_name_mapping
 
 NUM_ACTIONS = 2
 
@@ -15,13 +15,13 @@ class AdEnv:
         self.test_ts_ds = test_ts_ds
 
         self.group_id_group_name_mapping = get_group_id_group_name_mapping(self.config, self.test_ts_ds)
-        self.group_names = get_group_names_from_df(config, test_df)
+        self.group_names = list(self.group_id_group_name_mapping.values())
 
         self.env_steps_from_alert = get_env_steps_from_alert(self.config)
         self.env_restart_steps = get_env_restart_steps(self.config)
         self._env_group_name = None
 
-        self.num_series = get_num_series(self.config, self.test_df)
+        self.num_series = len(self.group_names)
         self.action_space = NUM_ACTIONS
 
         self._current_state = EnvState()

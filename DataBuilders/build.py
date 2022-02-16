@@ -1,4 +1,6 @@
+from config import update_config
 from data_factory import get_data_builder
+from Utils.data_utils import create_bounds_labels
 
 
 def build_data(config, dataset_name):
@@ -10,6 +12,16 @@ def build_data(config, dataset_name):
 def process_data(config, dataset_name, data):
     data_builder = get_data_builder(config, dataset_name)
     return data_builder.preprocess(data)
+
+
+def update_bounds(config, dataset_name, train_df, val_df, test_df):
+    data_builder = get_data_builder(config, dataset_name)
+    data_builder.update_bounds(train_df, val_df, test_df)
+    update_config(config)
+    train_df = create_bounds_labels(config, train_df)
+    val_df = create_bounds_labels(config, val_df)
+    test_df = create_bounds_labels(config, test_df)
+    return train_df, val_df, test_df
 
 
 def split_df(config, dataset_name, data):

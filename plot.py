@@ -6,8 +6,8 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import os
 from config import DATETIME_COLUMN, PLOT
-from data_utils import get_dataloader
-from utils import get_prediction_mode
+from Utils.data_utils import get_dataloader
+from Utils.utils import get_prediction_mode
 
 BASE_FOLDER = os.path.join("tmp", "pycharm_project_99")
 
@@ -228,22 +228,21 @@ def plot_msl_data(config, data_to_plot, dataset_name):
     fig.write_html(os.path.join(PLOT, dataset_name, 'data.html'))
 
 
-
 def plot_straus_data(dataset_name, data_to_plot):
-    # for qmp_id in pd.unique(data_to_plot['QmpId']):
-    #     sub_df = data_to_plot[data_to_plot.QmpId == qmp_id][['ActualValue', 'time_idx', 'key', DATETIME_COLUMN]]
-    #     sub_df = sub_df.sort_values(by=['key', DATETIME_COLUMN], ascending=True)
-    #     fig = px.line(sub_df, y="ActualValue", x=DATETIME_COLUMN, color='key')
-    #     fig.write_html('straus_data_qmp_id_{}.html'.format(qmp_id))
-    for order_step_id in pd.unique(data_to_plot['OrderStepId']):
-        sub_df = data_to_plot[data_to_plot.OrderStepId == order_step_id][
-            ['ActualValue', 'time_idx', 'key', DATETIME_COLUMN, 'is_stoppage']]
+    for qmp_id in pd.unique(data_to_plot['QmpId']):
+        sub_df = data_to_plot[data_to_plot.QmpId == qmp_id][['ActualValue', 'time_idx', 'key', DATETIME_COLUMN]]
         sub_df = sub_df.sort_values(by=['key', DATETIME_COLUMN], ascending=True)
         fig = px.line(sub_df, y="ActualValue", x=DATETIME_COLUMN, color='key')
-        stoppage_df = sub_df[[DATETIME_COLUMN, "is_stoppage"]].drop_duplicates().sort_values(by=DATETIME_COLUMN)
-        fig.add_trace(go.Scatter(x=stoppage_df[DATETIME_COLUMN], y=stoppage_df["is_stoppage"],
-                                 mode='lines',
-                                 name='stoppage'))
-        fig.write_html(os.path.join(PLOT, dataset_name, 'straus_data_order_step_id_{}.html'.format(order_step_id)))
+        fig.write_html('straus_data_qmp_id_{}.html'.format(qmp_id))
+    # for order_step_id in pd.unique(data_to_plot['OrderStepId']):
+    #     sub_df = data_to_plot[data_to_plot.OrderStepId == order_step_id][
+    #         ['ActualValue', 'time_idx', 'key', DATETIME_COLUMN, 'is_stoppage']]
+    #     sub_df = sub_df.sort_values(by=['key', DATETIME_COLUMN], ascending=True)
+    #     fig = px.line(sub_df, y="ActualValue", x=DATETIME_COLUMN, color='key')
+    #     stoppage_df = sub_df[[DATETIME_COLUMN, "is_stoppage"]].drop_duplicates().sort_values(by=DATETIME_COLUMN)
+    #     fig.add_trace(go.Scatter(x=stoppage_df[DATETIME_COLUMN], y=stoppage_df["is_stoppage"],
+    #                              mode='lines',
+    #                              name='stoppage'))
+    #     fig.write_html(os.path.join(PLOT, dataset_name, 'straus_data_order_step_id_{}.html'.format(order_step_id)))
     # fig = px.line(data_to_plot, y="ActualValue", x=DATETIME_COLUMN, color='key')
     # fig.write_html('straus_data.html')

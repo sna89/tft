@@ -69,4 +69,3 @@ def flatten_nested_list(nl):
             flat_list.append(item)
     return flat_list
 
-

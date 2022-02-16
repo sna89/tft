@@ -5,7 +5,7 @@
       <excludeFolder url="file://$MODULE_DIR$/Data" />
       <excludeFolder url="file://$MODULE_DIR$/tb_logs" />
     </content>
-    <orderEntry type="jdk" jdkName="Remote Python 3.8.5 (sftp://sna89@132.68.161.40:22/home/sna89/TFTVenv/bin/python3.8)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.6.9 (sftp://techadm@137.117.231.114:22/home/techadm/AdVenv/bin/python3.6)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

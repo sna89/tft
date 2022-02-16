@@ -1,7 +1,7 @@
 from pytorch_forecasting import TemporalFusionTransformer
 from pytorch_forecasting.models.temporal_fusion_transformer.tuning import optimize_hyperparameters
 from pytorch_forecasting import TimeSeriesDataSet
-from utils import save_to_pickle
+from Utils.utils import save_to_pickle
 
 
 def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path, loss):

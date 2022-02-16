@@ -1,13 +1,13 @@
 from Algorithms.thts.node import DecisionNode, ChanceNode
 import numpy as np
-from EnvCommon.env_thts_common import is_out_of_bounds, calc_good_alert_reward
+from EnvCommon.env_thts_common import calc_good_alert_reward
 from config import get_missed_alert_reward, \
     get_good_alert_reward, \
     get_false_alert_reward, \
     get_env_steps_from_alert, \
     QUANTILES, \
     get_num_quantiles
-from data_utils import get_group_lower_and_upper_bounds
+from Utils.data_utils import get_group_lower_and_upper_bounds
 
 UCT_BIAS = np.sqrt(2)
 

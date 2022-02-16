@@ -1,6 +1,6 @@
 import os
 import pathlib
-from utils import save_to_pickle, load_pickle
+from Utils.utils import save_to_pickle, load_pickle
 
 PKL_FOLDER = "pkl"
 CONFIG_PKL_FILE = "config.pkl"
@@ -22,7 +22,8 @@ DATA_BASE_FOLDER = os.path.join(DATA)
 
 path = pathlib.Path(__file__).parent.resolve()
 PLOT = os.path.join(path, "Plots")
-PLOT = os.path.join(PLOT)
+
+RESULT = os.path.join(path, "Results")
 
 STUDY = "Study"
 STUDY_BASE_FOLDER = os.path.join(STUDY)
@@ -33,12 +34,26 @@ CLASSIFICATION_FOLDER = "Class"
 REGRESSION_TASK_TYPE = "reg"
 REGRESSION_FOLDER = "Reg"
 
+THTS_TASK_TYPE = "thts"
+THTS_FOLDER = "THTS"
+
 COMBINED_TASK_TYPE = "combined"
 COMBINED_FOLDER = "Combined"
 
 ROLLOUT_TASK_TYPE = "rollout"
 
 QUANTILES = [0.01, 0.2, 0.5, 0.8, 0.99]
+
+
+def get_task_folder_name(task_type=REGRESSION_TASK_TYPE, prefix=None):
+    folder_name = None
+    if task_type == REGRESSION_TASK_TYPE:
+        folder_name = prefix + "_" + REGRESSION_FOLDER if prefix else REGRESSION_FOLDER
+    elif task_type == CLASSIFICATION_TASK_TYPE:
+        folder_name = prefix + "_" + CLASSIFICATION_FOLDER if prefix else CLASSIFICATION_FOLDER
+    elif task_type == THTS_TASK_TYPE:
+        folder_name = prefix + "_" + THTS_FOLDER if prefix else THTS_FOLDER
+    return folder_name
 
 
 def init_base_folders():
@@ -142,7 +157,7 @@ def get_config(dataset_name, model_name):
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
-            "Filename": "SyntheticData_Version_6_Correlated_10.csv",
+            "Filename": "SyntheticData_Version_7_Correlated_0.csv",
             "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_df.pkl'),
             "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_train_df.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER, model_name),
@@ -162,6 +177,7 @@ def get_config(dataset_name, model_name):
         "Straus": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Straus'),
             "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'straus_test_df.pkl'),
+            "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'straus_train_df.pkl'),
             "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'straus_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER, model_name),
             "GroupKeyword": "key",
@@ -172,6 +188,7 @@ def get_config(dataset_name, model_name):
             "DatetimeAdditionalColumns": ['hour', 'day_of_month', 'day_of_week', 'minute'],
             "EncoderLength": 360,
             "PredictionLength": 30,
+            "ObservedBoundKeyword": "ObservedBound",
         },
         "SMD": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'SMD'),
@@ -212,45 +229,8 @@ def get_config(dataset_name, model_name):
         "AnomalyConfig":
             {
                 "Synthetic": {},
-                "Fisherman": {
-                    "U100330": {
-                        "lb": -16.7225,
-                        "hb": -9.5,
-                    },
-                    "U100314": {
-                        "lb": -19.15,
-                        "hb": 20.9,
-                    },
-                    "U100329": {
-                        "lb": 2.87,
-                        "hb": 18.8,
-                    },
-                    "U100337": {
-                        "lb": 0.5,
-                        "hb": 6.5,
-                    },
-                    "U106724": {
-                        "lb": -0.65,
-                        "hb": 7,
-                    },
-                    "U100312": {
-                        "lb": 0.5,
-                        "hb": 6.5,
-                    },
-                    "U100309": {
-                        "lb": 0.5,
-                        "hb": 5.5,
-                    },
-                    "U100310": {
-                        "lb": 5.1,
-                        "hb": 14,
-                    },
-                    "U106755": {
-                        "lb": 15,
-                        "hb": 25,
-                    },
-                }
-
+                "Fisherman": {},
+                "Straus": {},
             },
         "Env": {
             "ConsecutiveExceptions": 1,
@@ -270,8 +250,8 @@ def get_config(dataset_name, model_name):
             }
         },
         "THTS": {
-            "NumTrials": 200,
-            "TrialLength": 8
+            "NumTrials": 100,
+            "TrialLength": 4
         }
 
     }
