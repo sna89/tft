@@ -9,7 +9,7 @@ def optimize_tft_hp(train_dl, val_dl, study_pkl_path, study_path, loss):
         train_dl,
         val_dl,
         model_path=study_path,
-        n_trials=10,
+        n_trials=20,
         max_epochs=50,
         gradient_clip_val_range=(0.01, 1.0),
         hidden_size_range=(8, 128),
@@ -36,7 +36,7 @@ def create_tft_model(training_data: TimeSeriesDataSet, loss, output_size, study=
             params,
             hidden_size=params['hidden_size'],
             output_size=output_size,
-            loss=loss,
+            loss=loss
         )
 
     else:

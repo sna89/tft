@@ -1,6 +1,6 @@
 import pandas as pd
-from pytorch_forecasting import TimeSeriesDataSet
-from Utils.data_utils import add_bounds_to_config
+from pytorch_forecasting import TimeSeriesDataSet, NaNLabelEncoder
+from Utils.data_utils import add_bounds_to_config, get_bound_col_name
 from DataBuilders.data_builder import DataBuilder
 import numpy as np
 import os
@@ -58,10 +58,12 @@ class SyntheticDataBuilder(DataBuilder):
         return ts_ds
 
     def define_classification_ts_ds(self, train_df):
+        bound_col = get_bound_col_name(self.config)
+
         ts_ds = TimeSeriesDataSet(
             train_df,
             time_idx="time_idx",
-            target=self.config.get("ObservedBoundKeyword"),
+            target=bound_col,
             group_ids=[self.config.get("GroupKeyword")],
             min_encoder_length=self.enc_length,
             max_encoder_length=self.enc_length,
@@ -72,11 +74,11 @@ class SyntheticDataBuilder(DataBuilder):
             time_varying_known_categoricals=[],
             static_reals=[],
             static_categoricals=[self.config.get("GroupKeyword")],
-            time_varying_unknown_categoricals=[self.config.get("ObservedBoundKeyword")],
+            time_varying_unknown_categoricals=[bound_col],
             add_relative_time_idx=True,
             add_target_scales=False,
             randomize_length=None,
-            # categorical_encoders={self.config.get("GroupKeyword"): NaNLabelEncoder(add_nan=True)}
+            categorical_encoders={bound_col: NaNLabelEncoder(add_nan=True)}
         )
         return ts_ds
 

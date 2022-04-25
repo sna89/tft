@@ -57,7 +57,7 @@ def fit_model(config, task_type, train_ds, val_ds, model_name, loss, output_size
         model = create_model(model_name, train_ds, loss, output_size, study)
         trainer = fit(trainer, model, train_dl, val_dl)
 
-        model = get_model_from_trainer(trainer, model_name)
+        model = get_model_from_trainer(trainer, model_name, task_type)
 
     else:
         checkpoint = os.getenv("CHECKPOINT_{}".format(task_type.upper()))
@@ -78,7 +78,7 @@ def create_trainer(study=None, gradient_clip_val=0.1, model_name="my_model"):
 
     trainer = pl.Trainer(
         gpus=1,
-        max_epochs=200,
+        max_epochs=20,
         gradient_clip_val=gradient_clip_val,
         callbacks=[lr_logger, early_stop_callback],
         logger=logger,

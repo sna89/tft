@@ -138,11 +138,7 @@ def calc_bound_delta(group_bounds):
 def create_bounds_labels(config, data):
     is_observed = os.getenv("IS_EXCEPTION_OBSERVED") == "True"
     bound_col = config.get("ObservedBoundKeyword") if is_observed else config.get("UnobservedBoundKeyword")
-
-    if is_observed:
-        data = add_observed_bound_column(bound_col, data)
-    else:
-        data = add_unobserved_bound_column(bound_col, data)
+    add_bound_column(bound_col, data)
 
     groups = pd.unique(data[config.get("GroupKeyword")])
     for group in groups:
@@ -154,13 +150,15 @@ def create_bounds_labels(config, data):
     return data
 
 
-def add_observed_bound_column(observed_bound_col, data):
-    data[observed_bound_col] = False
-    return data
+def get_bound_col_name(config):
+    bound_col = config.get("ObservedBoundKeyword") \
+        if os.getenv("IS_EXCEPTION_OBSERVED") == "True" \
+        else config.get("UnobservedBoundKeyword")
+    return bound_col
 
 
-def add_unobserved_bound_column(unobserved_bound_col, data):
-    data[unobserved_bound_col] = False
+def add_bound_column(bound_col, data):
+    data[bound_col] = False
     return data
 
 
@@ -181,7 +179,7 @@ def get_group_id_group_name_mapping(config, ts_ds):
 
     for group_id in group_ids:
         group_indices = ts_ds_index[ts_ds_index["group_id"] == group_id].index
-        group_name = ts_ds.decoded_index.iloc[group_indices.min()][config.get("GroupKeyword")]
+        group_name = ts_ds.decoded_index.iloc[group_indices.min()][config.get("GroupKeyword", None)]
         group_id_group_name_mapping[group_id] = group_name
 
     return group_id_group_name_mapping

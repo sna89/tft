@@ -1,5 +1,6 @@
 from DataBuilders.build import convert_df_to_ts_data
 from Models.trainer import optimize_hp, fit_model
+from Utils.data_utils import get_bound_col_name
 from evaluation import evaluate_regression, evaluate_classification, evaluate_combined
 from plot import plot_reg_predictions
 from Loss.weighted_cross_entropy import WeightedCrossEntropy
@@ -19,7 +20,7 @@ def run_time_series_task(config,
                          plot=False):
     train_ts_ds, parameters = convert_df_to_ts_data(config, dataset_name, train_df, None, task_type)
     val_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, val_df, parameters, task_type)
-    test_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, test_df, parameters, task_type)
+    test_ts_ds, _ = convert_df_to_ts_data(config, dataset_name, test_df, None, task_type)
 
     model_name = get_model_name(task_type)
     weights = get_loss_weights(config, task_type, train_df, val_df)
@@ -48,7 +49,7 @@ def run_time_series_task(config,
 
     if evaluate:
         if task_type == REGRESSION_TASK_TYPE:
-            evaluate_regression(config, val_ts_ds, fitted_model, num_targets)
+            evaluate_regression(config, test_ts_ds, fitted_model, num_targets)
         elif task_type == CLASSIFICATION_TASK_TYPE:
             evaluate_classification(config, val_ts_ds, fitted_model, num_targets)
         elif task_type == COMBINED_TASK_TYPE:
@@ -67,7 +68,9 @@ def get_label_weights(df, labels, label_keyword):
         label_count = df[df[label_keyword] == label].shape[0]
         weights.append(label_count)
     max_weight = max(weights)
-    weights = [max_weight / weight for weight in weights]
+    weights = [0 if weight == 0 else max_weight / weight
+               for weight
+               in weights]
     return weights
 
 
@@ -75,9 +78,10 @@ def get_loss_weights(config, task_type, train_df, val_df):
     loss_weights = None
     if os.getenv("DATASET") == "Synthetic":
         if task_type in [CLASSIFICATION_TASK_TYPE, COMBINED_TASK_TYPE]:
+            bound_col = get_bound_col_name(config)
             loss_weights = get_label_weights(pd.concat([train_df, val_df], axis=0),
                                              labels=[str(0), str(1)],
-                                             label_keyword=config.get("ObservedBoundKeyword"))
+                                             label_keyword=bound_col)
 
     return loss_weights
 

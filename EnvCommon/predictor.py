@@ -108,7 +108,8 @@ class Predictor:
 
     def sample_from_prediction(self, model_prediction, group_id, chosen_quantile):
         sampled_prediction = {}
-        quantile_idx_list = np.random.randint(low=1, high=self.num_quantiles - 1, size=self.num_series)
+        quantile_idx_list = [self.num_quantiles // 2] * self.num_series
+        # quantile_idx_list = np.random.randint(low=1, high=self.num_quantiles - 1, size=self.num_series)
         quantile_idx_list[group_id] = chosen_quantile
 
         for _, (group_name, group_prediction) in enumerate(model_prediction.items()):

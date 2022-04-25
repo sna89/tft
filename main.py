@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     train_df, val_df, test_df = split_df(config, dataset_name, data)
     update_bounds(config, dataset_name, train_df, val_df, test_df)
-    # plot_data(config, dataset_name, pd.concat([train_df, val_df, test_df], axis=0))
+    # plot_data(config, dataset_name, train_df)
     # plot_data(config, dataset_name, val_df)
     # plot_data(config, dataset_name, test_df)
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
                                                 train_df,
                                                 val_df,
                                                 test_df,
-                                                evaluate=False,
+                                                evaluate=True,
                                                 plot=False)
 
     if os.getenv("CLASS_TASK") == "True":
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                              train_df,
                              val_df,
                              test_df,
-                             evaluate=True)
+                             evaluate=False)
 
     if os.getenv("ROLLOUT_REG_TASK") == "True":
         run_rollout_task(config,
@@ -72,16 +72,16 @@ if __name__ == '__main__':
         group_names = get_group_names_from_df(config, test_df)
 
         # if False:
-        PARALLEL_GROUPS = 5
-        for group_names_chunk in create_chunks(group_names[5:], PARALLEL_GROUPS):
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                executor.map(run_thts_task_for_group, group_names_chunk)
+        # PARALLEL_GROUPS = 10
+        # for group_names_chunk in create_chunks(group_names, PARALLEL_GROUPS):
+        #     with concurrent.futures.ProcessPoolExecutor() as executor:
+        #         executor.map(run_thts_task_for_group, group_names_chunk)
         # else:
-        # run_thts_task_for_group(group_names[0])
+        run_thts_task_for_group(group_names[0])
 
     if os.getenv("APPLY_ANOMALY_DETECTION") == "True":
         detector = AnomalyDetection(config, os.getenv("MODEL_NAME_REG"), dataset_name, fitted_reg_model)
-        anomaly_df = detector.detect_and_evaluate(train_df, test_df, True)
+        anomaly_df = detector.detect_and_evaluate(train_df, False)
 
     # trajectory_sample = TrajectorySample(ad_env, config, fitted_reg_model, val_df, test_df, num_trajectories=5000)
     # trajectory_sample.run()

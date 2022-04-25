@@ -35,7 +35,7 @@ REGRESSION_TASK_TYPE = "reg"
 REGRESSION_FOLDER = "Reg"
 
 THTS_TASK_TYPE = "thts"
-THTS_FOLDER = "THTS"
+THTS_FOLDER = "THTS_BugFix_Deterministic"
 
 COMBINED_TASK_TYPE = "combined"
 COMBINED_FOLDER = "Combined"
@@ -157,7 +157,7 @@ def get_config(dataset_name, model_name):
         },
         "Synthetic": {
             "Path": os.path.join(DATA_BASE_FOLDER, 'Synthetic'),
-            "Filename": "SyntheticData_Version_7_Correlated_0.csv",
+            "Filename": "SyntheticData_Version_15_Correlated_10.csv",
             "TestDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_test_df.pkl'),
             "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'synthetic_train_df.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Synthetic', REGRESSION_FOLDER, model_name),
@@ -180,7 +180,7 @@ def get_config(dataset_name, model_name):
             "TrainDataFramePicklePath": os.path.join(PKL_FOLDER, 'straus_train_df.pkl'),
             "TestTsDsPicklePath": os.path.join(PKL_FOLDER, 'straus_test_ts_ds.pkl'),
             "StudyRegPath": os.path.join(STUDY_BASE_FOLDER, 'Straus', REGRESSION_FOLDER, model_name),
-            "GroupKeyword": "key",
+            "GroupKeyword": "QmpId",
             "GroupColumns": ['PartId', 'OrderStepId', "QmpId"],
             "ValueKeyword": "ActualValue",
             # "ValueKeyword": "ShellIndex",
@@ -234,7 +234,7 @@ def get_config(dataset_name, model_name):
             },
         "Env": {
             "ConsecutiveExceptions": 1,
-            "AlertMaxPredictionSteps": 6,
+            "AlertMaxPredictionSteps": 4,
             "RestartSteps": 10,
             "Rewards": {
                 "CheapFP": {
@@ -250,8 +250,8 @@ def get_config(dataset_name, model_name):
             }
         },
         "THTS": {
-            "NumTrials": 100,
-            "TrialLength": 4
+            "NumTrials": 30,
+            "TrialLength": 6
         }
 
     }

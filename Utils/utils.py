@@ -33,11 +33,11 @@ def create_chunks(l, chunk_size):
         yield l[i: i + chunk_size]
 
 
-def get_model_from_trainer(trainer, model_name):
+def get_model_from_trainer(trainer, model_name, task_type):
     best_model_path = trainer.checkpoint_callback.best_model_path
-    os.environ["CHECKPOINT"] = best_model_path
-    best_tft = get_model_from_checkpoint(best_model_path, model_name)
-    return best_tft
+    os.environ["CHECKPOINT_{}".format(task_type.upper())] = best_model_path
+    model = get_model_from_checkpoint(best_model_path, model_name)
+    return model
 
 
 def get_model_from_checkpoint(checkpoint, model_name):

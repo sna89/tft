@@ -72,7 +72,7 @@ def run_heuristic_wait(config, group_name, steps, group_prediction):
     return value
 
 
-def run_heuristic_action(config, group_name, steps, group_prediction):
+def run_heuristic_alert(config, group_name, steps, group_prediction):
     good_alert_reward = get_good_alert_reward(config)
     false_alert_reward = get_false_alert_reward(config)
     env_steps_from_alert = get_env_steps_from_alert(config)
@@ -130,7 +130,7 @@ def run_heuristic(config, chance_node, steps, prediction, group_name):
         value = run_heuristic_wait(config, group_name, steps, group_prediction)
 
     elif chance_node.action == 1:
-        value = run_heuristic_action(config, group_name, steps, group_prediction)
+        value = run_heuristic_alert(config, group_name, steps, group_prediction)
 
     chance_node.value = value
 

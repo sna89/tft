@@ -48,11 +48,19 @@ def add_dummy_data_to_df(config,
 
 def choose_action(prediction, lb, ub, task_type):
     rollout_decision = None
+
     if task_type == REGRESSION_TASK_TYPE:
         rollout_decision = np.where((lb <= prediction) & (prediction <= ub), 0, 1)
     elif task_type == CLASSIFICATION_TASK_TYPE:
         rollout_decision = prediction
-    rollout_decision = min(1, int(np.sum(rollout_decision)))
+
+    if isinstance(rollout_decision, np.ndarray):
+        rollout_decision = min(1, int(np.sum(rollout_decision)))
+    elif torch.is_tensor(rollout_decision):
+        rollout_decision = min(1, int(torch.sum(rollout_decision)))
+    else:
+        raise ValueError
+
     return rollout_decision
 
 
@@ -260,7 +268,8 @@ def run_rollout_task(config,
                terminal_history_mapping[group_name],
                restart_history_mapping[group_name],
                steps_from_alert_history_mapping[group_name],
-               restart_steps_history_mapping[group_name])
+               restart_steps_history_mapping[group_name],
+               task_type)
 
 
 def is_first_test_iteration(x, idx, val_last_time_idx):

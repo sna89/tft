@@ -88,6 +88,7 @@ class ChanceNode(Node):
         super(ChanceNode, self).__init__(state, parent)
         self._action = action
         self._reward = 0
+        self._reward_list = []
 
     def get_successor(self, quantile):
         for decision_node in self.successors:
@@ -102,6 +103,13 @@ class ChanceNode(Node):
     @reward.setter
     def reward(self, new_reward):
         self._reward = new_reward
+
+    @property
+    def reward_list(self):
+        return self._reward_list
+
+    def append_to_reward_list(self, new_reward):
+        self._reward_list.append(new_reward)
 
     @property
     def action(self):

@@ -70,6 +70,8 @@ def evaluate_classification(config, ts_ds, model, num_targets):
 
 
 def trim_last_samples(sample_list, k):
+    if isinstance(sample_list, list):
+        sample_list = sample_list[0]
     return torch.Tensor([min(sum(a[:k]), 1) for a in sample_list])
 
 

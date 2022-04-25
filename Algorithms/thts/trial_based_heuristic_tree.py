@@ -102,7 +102,8 @@ class TrialBasedHeuristicTree:
                        terminal_history,
                        restart_history,
                        steps_from_alert_history,
-                       restart_steps_history)
+                       restart_steps_history,
+                       THTS_TASK_TYPE)
 
             current_node = DecisionNode(next_state, parent=current_node, terminal=False)
             clear_env_state_history(current_node.state)
@@ -219,7 +220,9 @@ class TrialBasedHeuristicTree:
                 sampled_prediction = self.predictor.sample_from_prediction(prediction, self.tree_group_id,
                                                                            chosen_quantile)
                 next_state, reward = self._create_next_state(chance_node, sampled_prediction)
-                chance_node.reward = reward
+                chance_node.append_to_reward_list(reward)
+                chance_node_reward_list = chance_node.reward_list
+                chance_node.reward = sum(chance_node_reward_list) / float(len(chance_node_reward_list))
                 decision_node = self.add_decision_node(next_state,
                                                        chance_node,
                                                        chosen_quantile=chosen_quantile,
